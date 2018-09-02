@@ -7,8 +7,8 @@ import android.arch.persistence.room.TypeConverters
 import android.content.Context
 import app.dav.davandroidlibrary.Dav.DATABASE_NAME
 
-@Database(entities = [TableObject::class, Property::class], version = 1)
-@TypeConverters(Converters::class)
+@Database(entities = [TableObjectEntity::class, PropertyEntity::class], version = 1)
+//@TypeConverters(Converters::class)
 abstract class DavDatabase : RoomDatabase() {
     abstract fun tableObjectDao(): TableObjectDao
     abstract fun propertyDao(): PropertyDao

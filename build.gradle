@@ -40,6 +40,9 @@ dependencies {
     kapt 'android.arch.persistence.room:compiler:' + roomVersion
 
     implementation "android.arch.lifecycle:extensions:" + lifecycleVersion
+
+    // Kotlin Coroutines
+    //implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:0.25.0'
 }
 repositories {
     mavenCentral()

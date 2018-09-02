@@ -4,18 +4,71 @@ import android.arch.persistence.room.ColumnInfo
 import android.arch.persistence.room.Entity
 import android.arch.persistence.room.ForeignKey
 import android.arch.persistence.room.PrimaryKey
+import app.dav.davandroidlibrary.Dav
 import org.jetbrains.annotations.NotNull
-/*
+
 @Entity(
+        tableName = "Property",
         foreignKeys = [
-            ForeignKey(entity = TableObject::class, parentColumns = ["id"], childColumns = ["table_object_id"])
+            ForeignKey(entity = TableObjectEntity::class, parentColumns = ["id"], childColumns = ["table_object_id"])
         ]
 )
-*/
-@Entity
-class Property(
-        @PrimaryKey @NotNull val id: Int,
-        @ColumnInfo(name = "table_object_id") val tableObjectId: Int,
-        val name: String,
-        val value: String
-)
+data class PropertyEntity(
+        @ColumnInfo(name = "table_object_id") var tableObjectId: Long,
+        var name: String,
+        var value: String
+){
+    @PrimaryKey var id: Long? = null
+}
+
+class Property{
+    var id: Long = 0
+    var tableObjectId: Long = 0
+    var name: String = ""
+    var value: String = ""
+
+    constructor(){}
+
+    constructor(tableObjectId: Long, name: String, value: String){
+        this.tableObjectId = tableObjectId
+        this.name = name
+        this.value = value
+
+        save()
+    }
+
+    fun setPropertyValue(value: String){
+        this.value = value
+        save()
+    }
+
+    private fun save(){
+        // Check if the table object already exists
+        if(tableObjectId.equals(0)){
+            if(!Dav.Database.propertyExists(id)){
+                id = Dav.Database.createProperty(this)
+            }else{
+                Dav.Database.updateProperty(this)
+            }
+        }
+    }
+
+    companion object {
+        fun convertPropertyEntityToProperty(propertyEntity: PropertyEntity) : Property{
+            val property = Property()
+            property.id = propertyEntity.id ?: 0
+            property.tableObjectId = propertyEntity.tableObjectId
+            property.name = propertyEntity.name
+            property.value = propertyEntity.value
+            return property
+        }
+
+        fun convertPropertyToPropertyEntity(property: Property) : PropertyEntity{
+            val propertyEntity = PropertyEntity(property.tableObjectId,
+                    property.name,
+                    property.value)
+            propertyEntity.id = property.id
+            return propertyEntity
+        }
+    }
+}
