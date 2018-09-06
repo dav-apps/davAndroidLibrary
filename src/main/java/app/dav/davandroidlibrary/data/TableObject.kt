@@ -1,8 +1,10 @@
 package app.dav.davandroidlibrary.data
 
-import android.arch.persistence.room.*
+import android.arch.lifecycle.LiveData
+import android.arch.lifecycle.MutableLiveData
+import android.arch.persistence.room.Entity
+import android.arch.persistence.room.PrimaryKey
 import app.dav.davandroidlibrary.Dav
-import org.jetbrains.annotations.NotNull
 import java.io.File
 import java.util.*
 import kotlin.collections.ArrayList
@@ -27,17 +29,23 @@ class TableObject{
     var uploadStatus: TableObjectUploadStatus = TableObjectUploadStatus.New
     var isFile: Boolean = false
     var etag: String = ""
-    var properties: ArrayList<Property> = ArrayList<Property>()
+    private val propertiesData = MutableLiveData<ArrayList<Property>>()
+    val properties: LiveData<ArrayList<Property>>
+        get() = propertiesData
 
-    constructor()
+    constructor(){
+        propertiesData.value = ArrayList<Property>()
+    }
 
     constructor(tableId: Int){
+        propertiesData.value = ArrayList<Property>()
         this.tableId = tableId
 
         save()
     }
 
     constructor(uuid: UUID, tableId: Int){
+        propertiesData.value = ArrayList<Property>()
         this.uuid = uuid
         this.tableId = tableId
 
@@ -45,6 +53,7 @@ class TableObject{
     }
 
     constructor(uuid: UUID, tableId: Int, file: File){
+        propertiesData.value = ArrayList<Property>()
         this.uuid = uuid
         this.tableId = tableId
 
@@ -52,9 +61,10 @@ class TableObject{
     }
 
     constructor(uuid: UUID, tableId: Int, properties: ArrayList<Property>){
+        propertiesData.value = ArrayList<Property>()
         this.uuid = uuid
         this.tableId = tableId
-        for (p in properties) this.properties.add(p)
+        for (p in properties) addProperty(p)
 
         saveWithProperties()
     }
@@ -63,7 +73,7 @@ class TableObject{
         // Check if the table object already exists
         if(!Dav.Database.tableObjectExists(uuid)){
             uploadStatus = TableObjectUploadStatus.New
-            id = Dav.Database.createTableObject(this)
+            Dav.Database.createTableObject(this)
         }else{
             Dav.Database.updateTableObject(this)
         }
@@ -80,7 +90,7 @@ class TableObject{
                 id = tableObject.id
 
                 Dav.Database.updateTableObject(this)
-                for(p in properties) tableObject.setPropertyValue(p.name, p.value)
+                for(p in getProperties()) tableObject.setPropertyValue(p.name, p.value)
             }
         }
 
@@ -88,17 +98,26 @@ class TableObject{
     }
 
     fun loadProperties(){
-        val properties = Dav.Database.getPropertiesOfTableObject(id).value
-        if(properties != null) this.properties = properties
+        Dav.Database.getPropertiesOfTableObject(id).observeForever {
+            this.propertiesData.value = it
+        }
+    }
+
+    fun getProperties() : ArrayList<Property>{
+        return propertiesData.value ?: ArrayList<Property>()
+    }
+
+    private fun addProperty(property: Property){
+        propertiesData.value?.add(property)
     }
 
     fun getPropertyValue(name: String) : String?{
-        val property = properties.find { it.name == name }
+        val property = getProperties().find { it.name == name }
         return if(property != null) property.value else null
     }
 
     fun setPropertyValue(name: String, value: String){
-        val property = properties.find { it.name == name }
+        val property = getProperties().find { it.name == name }
 
         if(property != null){
             if(property.value == value) return
@@ -107,7 +126,7 @@ class TableObject{
             property.setPropertyValue(value)
         }else{
             // Create a new property
-            properties.add(Property(id, name, value))
+            addProperty(Property(id, name, value))
         }
 
         if(uploadStatus == TableObjectUploadStatus.UpToDate && !isFile)
@@ -137,8 +156,9 @@ class TableObject{
         }
 
         fun convertTableObjectEntityToTableObject(obj: TableObjectEntity) : TableObject{
-            val tableObject = TableObject(obj.tableId)
+            val tableObject = TableObject()
             tableObject.id = obj.id ?: 0
+            tableObject.tableId = obj.tableId
             tableObject.uuid = UUID.fromString(obj.uuid)
             tableObject.visibility = TableObject.convertIntToVisibility(obj.visibility)
             tableObject.uploadStatus = TableObject.convertIntToUploadStatus(obj.uploadStatus)
