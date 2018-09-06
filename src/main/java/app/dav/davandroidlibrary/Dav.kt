@@ -5,6 +5,7 @@ import android.arch.lifecycle.MutableLiveData
 import android.arch.lifecycle.Transformations
 import android.content.Context
 import app.dav.davandroidlibrary.data.*
+import kotlinx.coroutines.experimental.launch
 import java.util.*
 
 object Dav {
@@ -17,28 +18,31 @@ object Dav {
     }
 
     object Database{
-        fun createTableObject(tableObject: TableObject) : Long{
-            return database?.tableObjectDao()?.insertTableObject(TableObject.convertTableObjectToTableObjectEntity(tableObject)) ?: 0
+        fun createTableObject(tableObject: TableObject){
+            launch {
+                database?.tableObjectDao()?.insertTableObject(TableObject.convertTableObjectToTableObjectEntity(tableObject))
+            }
         }
 
-        fun createTableObjectWithProperties(tableObject: TableObject) : Long{
-            val tableObjectEntity = TableObjectEntity(tableObject.tableId, tableObject.uuid.toString(), 0, 0, tableObject.isFile, tableObject.etag)
-            val id = database?.tableObjectDao()?.insertTableObject(tableObjectEntity) ?: 0
-            if(id.equals(0)){
-                for(property in tableObject.properties){
-                    property.tableObjectId = id
-                    property.id = database?.propertyDao()?.insertProperty(Property.convertPropertyToPropertyEntity(property)) ?: 0
+        fun createTableObjectWithProperties(tableObject: TableObject){
+            launch {
+                val tableObjectEntity = TableObjectEntity(tableObject.tableId, tableObject.uuid.toString(), 0, 0, tableObject.isFile, tableObject.etag)
+                val id = database?.tableObjectDao()?.insertTableObject(tableObjectEntity) ?: 0
+                if(!id.equals(0)){
+                    for(property in tableObject.getProperties()){
+                        property.tableObjectId = id
+                        property.id = database?.propertyDao()?.insertProperty(Property.convertPropertyToPropertyEntity(property)) ?: 0
+                    }
                 }
             }
-            return id
         }
 
         fun getTableObject(uuid: UUID) : TableObject?{
-            val tableObjectEntity = database?.tableObjectDao()?.getTableObject(uuid.toString())
+            val tableObjectEntity = database?.tableObjectDao()?.getTableObject(uuid.toString())?.value
             return if(tableObjectEntity != null) TableObject.convertTableObjectEntityToTableObject(tableObjectEntity) else null
         }
 
-        fun getAllTableObjects(tableId: Int, deleted: Boolean) : LiveData<ArrayList<TableObject>> {
+        fun getAllTableObjects(tableId: Int, deleted: Boolean) : LiveData<ArrayList<TableObject>>{
             val db = database
             val tableObjectEntities = if(db != null) db.tableObjectDao().getTableObjects() else MutableLiveData<List<TableObjectEntity>>()
 
@@ -60,15 +64,19 @@ object Dav {
         }
 
         fun updateTableObject(tableObject: TableObject){
-            database?.tableObjectDao()?.updateTableObject(TableObject.convertTableObjectToTableObjectEntity(tableObject))
+            launch {
+                database?.tableObjectDao()?.updateTableObject(TableObject.convertTableObjectToTableObjectEntity(tableObject))
+            }
         }
 
         fun tableObjectExists(uuid: UUID) : Boolean{
-            return database?.tableObjectDao()?.getTableObject(uuid.toString()) != null
+            return database?.tableObjectDao()?.getTableObject(uuid.toString())?.value != null
         }
 
-        fun createProperty(property: Property) : Long{
-            return database?.propertyDao()?.insertProperty(Property.convertPropertyToPropertyEntity(property)) ?: 0
+        fun createProperty(property: Property){
+            launch {
+                database?.propertyDao()?.insertProperty(Property.convertPropertyToPropertyEntity(property))
+            }
         }
 
         fun getPropertiesOfTableObject(tableObjectId: Long) : LiveData<ArrayList<Property>>{
@@ -88,11 +96,13 @@ object Dav {
         }
 
         fun updateProperty(property: Property){
-            database?.propertyDao()?.updateProperty(Property.convertPropertyToPropertyEntity(property))
+            launch {
+                database?.propertyDao()?.updateProperty(Property.convertPropertyToPropertyEntity(property))
+            }
         }
 
         fun propertyExists(id: Long) : Boolean{
-            return database?.propertyDao()?.getProperty(id) != null
+            return database?.propertyDao()?.getProperty(id)?.value != null
         }
     }
 }

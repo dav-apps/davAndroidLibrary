@@ -5,7 +5,6 @@ import android.arch.persistence.room.Entity
 import android.arch.persistence.room.ForeignKey
 import android.arch.persistence.room.PrimaryKey
 import app.dav.davandroidlibrary.Dav
-import org.jetbrains.annotations.NotNull
 
 @Entity(
         tableName = "Property",
@@ -46,7 +45,7 @@ class Property{
         // Check if the table object already exists
         if(tableObjectId.equals(0)){
             if(!Dav.Database.propertyExists(id)){
-                id = Dav.Database.createProperty(this)
+                Dav.Database.createProperty(this)
             }else{
                 Dav.Database.updateProperty(this)
             }
@@ -67,7 +66,8 @@ class Property{
             val propertyEntity = PropertyEntity(property.tableObjectId,
                     property.name,
                     property.value)
-            propertyEntity.id = property.id
+
+            propertyEntity.id = if(property.id == 0L) null else property.id
             return propertyEntity
         }
     }
