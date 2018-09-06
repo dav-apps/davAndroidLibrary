@@ -22,6 +22,11 @@ android {
         }
     }
 }
+kotlin {
+    experimental {
+        coroutines "enable"
+    }
+}
 
 dependencies {
     def roomVersion = "1.1.1"
@@ -42,7 +47,7 @@ dependencies {
     implementation "android.arch.lifecycle:extensions:" + lifecycleVersion
 
     // Kotlin Coroutines
-    //implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:0.25.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:0.24.0'
 }
 repositories {
     mavenCentral()
