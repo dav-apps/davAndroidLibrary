@@ -1,12 +1,12 @@
 package app.dav.davandroidlibrary
 
-import android.arch.lifecycle.LiveData
-import android.arch.lifecycle.MutableLiveData
-import android.arch.lifecycle.Transformations
 import android.content.Context
 import app.dav.davandroidlibrary.data.*
+import kotlinx.coroutines.experimental.Deferred
+import kotlinx.coroutines.experimental.async
 import kotlinx.coroutines.experimental.launch
 import java.util.*
+import kotlin.collections.ArrayList
 
 object Dav {
     const val apiBaseUrl = "https://dav-backend.herokuapp.com/v1/"
@@ -29,7 +29,7 @@ object Dav {
                 val tableObjectEntity = TableObjectEntity(tableObject.tableId, tableObject.uuid.toString(), 0, 0, tableObject.isFile, tableObject.etag)
                 val id = database?.tableObjectDao()?.insertTableObject(tableObjectEntity) ?: 0
                 if(!id.equals(0)){
-                    for(property in tableObject.getProperties()){
+                    for(property in tableObject.properties){
                         property.tableObjectId = id
                         property.id = database?.propertyDao()?.insertProperty(Property.convertPropertyToPropertyEntity(property)) ?: 0
                     }
@@ -37,24 +37,21 @@ object Dav {
             }
         }
 
-        fun getTableObject(uuid: UUID) : TableObject?{
-            val tableObjectEntity = database?.tableObjectDao()?.getTableObject(uuid.toString())?.value
-            return if(tableObjectEntity != null) TableObject.convertTableObjectEntityToTableObject(tableObjectEntity) else null
+        fun getTableObject(uuid: UUID) : Deferred<TableObject?>{
+            return async {
+                val tableObjectEntity = database?.tableObjectDao()?.getTableObject(uuid.toString())
+                if(tableObjectEntity != null) TableObject.convertTableObjectEntityToTableObject(tableObjectEntity) else null
+            }
         }
 
-        fun getAllTableObjects(tableId: Int, deleted: Boolean) : LiveData<ArrayList<TableObject>>{
-            val db = database
-            val tableObjectEntities = if(db != null) db.tableObjectDao().getTableObjects() else MutableLiveData<List<TableObjectEntity>>()
-
-            return Transformations.map(tableObjectEntities) {
+        fun getAllTableObjects(tableId: Int, deleted: Boolean) : Deferred<ArrayList<TableObject>>{
+            return async {
+                val db = database
+                val tableObjectEntities = if(db != null) db.tableObjectDao().getNonObservableTableObjects() else listOf()
                 val tableObjects = ArrayList<TableObject>()
 
-                for (obj in it){
-                    if (!deleted && obj.uploadStatus == TableObjectUploadStatus.Deleted.uploadStatus) continue;
-
+                for (obj in tableObjectEntities){
                     val tableObject = TableObject.convertTableObjectEntityToTableObject(obj)
-
-                    // Get the properties of the table object
                     tableObject.loadProperties()
                     tableObjects.add(tableObject)
                 }
@@ -69,8 +66,10 @@ object Dav {
             }
         }
 
-        fun tableObjectExists(uuid: UUID) : Boolean{
-            return database?.tableObjectDao()?.getTableObject(uuid.toString())?.value != null
+        fun tableObjectExists(uuid: UUID) : Deferred<Boolean>{
+            return async {
+                database?.tableObjectDao()?.getTableObject(uuid.toString()) != null
+            }
         }
 
         fun createProperty(property: Property){
@@ -79,14 +78,13 @@ object Dav {
             }
         }
 
-        fun getPropertiesOfTableObject(tableObjectId: Long) : LiveData<ArrayList<Property>>{
-            val db = database
-            val propertyEntries = if(db != null) db.propertyDao().getPropertiesOfTableObject(tableObjectId) else MutableLiveData<List<PropertyEntity>>()
-
-            return Transformations.map(propertyEntries) {
+        fun getPropertiesOfTableObject(tableObjectId: Long) : Deferred<ArrayList<Property>>{
+            return async {
+                val db = database
+                val propertyEntries: List<PropertyEntity> = if(db != null) db.propertyDao().getPropertiesOfTableObject(tableObjectId) else listOf<PropertyEntity>()
                 val properties = ArrayList<Property>()
 
-                for(propertyEntry in it){
+                for(propertyEntry in propertyEntries){
                     val property = Property.convertPropertyEntityToProperty(propertyEntry)
                     properties.add(property)
                 }
@@ -101,8 +99,10 @@ object Dav {
             }
         }
 
-        fun propertyExists(id: Long) : Boolean{
-            return database?.propertyDao()?.getProperty(id)?.value != null
+        fun propertyExists(id: Long) : Deferred<Boolean>{
+            return async {
+                database?.propertyDao()?.getProperty(id) != null
+            }
         }
     }
 }

@@ -1,10 +1,9 @@
 package app.dav.davandroidlibrary.data
 
-import android.arch.lifecycle.LiveData
-import android.arch.lifecycle.MutableLiveData
 import android.arch.persistence.room.Entity
 import android.arch.persistence.room.PrimaryKey
 import app.dav.davandroidlibrary.Dav
+import kotlinx.coroutines.experimental.launch
 import java.io.File
 import java.util.*
 import kotlin.collections.ArrayList
@@ -29,49 +28,41 @@ class TableObject{
     var uploadStatus: TableObjectUploadStatus = TableObjectUploadStatus.New
     var isFile: Boolean = false
     var etag: String = ""
-    private val propertiesData = MutableLiveData<ArrayList<Property>>()
-    val properties: LiveData<ArrayList<Property>>
-        get() = propertiesData
+    var properties = ArrayList<Property>()
 
-    constructor(){
-        propertiesData.value = ArrayList<Property>()
-    }
+    constructor()
 
     constructor(tableId: Int){
-        propertiesData.value = ArrayList<Property>()
         this.tableId = tableId
 
-        save()
+        launch { save() }
     }
 
     constructor(uuid: UUID, tableId: Int){
-        propertiesData.value = ArrayList<Property>()
         this.uuid = uuid
         this.tableId = tableId
 
-        save()
+        launch { save() }
     }
 
     constructor(uuid: UUID, tableId: Int, file: File){
-        propertiesData.value = ArrayList<Property>()
         this.uuid = uuid
         this.tableId = tableId
 
-        save()
+        launch { save() }
     }
 
     constructor(uuid: UUID, tableId: Int, properties: ArrayList<Property>){
-        propertiesData.value = ArrayList<Property>()
         this.uuid = uuid
         this.tableId = tableId
-        for (p in properties) addProperty(p)
+        for (p in properties) this.properties.add(p)
 
-        saveWithProperties()
+        launch { saveWithProperties() }
     }
 
-    private fun save(){
+    private suspend fun save(){
         // Check if the table object already exists
-        if(!Dav.Database.tableObjectExists(uuid)){
+        if(!Dav.Database.tableObjectExists(uuid).await()){
             uploadStatus = TableObjectUploadStatus.New
             Dav.Database.createTableObject(this)
         }else{
@@ -79,45 +70,38 @@ class TableObject{
         }
     }
 
-    private fun saveWithProperties(){
+    private suspend fun saveWithProperties(){
         // Check if the table object already exists
-        if(!Dav.Database.tableObjectExists(uuid)){
+        if(!Dav.Database.tableObjectExists(uuid).await()){
             Dav.Database.createTableObjectWithProperties(this)
         }else{
-            val tableObject = Dav.Database.getTableObject(uuid)
+            val tableObject = Dav.Database.getTableObject(uuid).await()
 
             if(tableObject != null){
                 id = tableObject.id
 
                 Dav.Database.updateTableObject(this)
-                for(p in getProperties()) tableObject.setPropertyValue(p.name, p.value)
+                for(p in properties) tableObject.setPropertyValue(p.name, p.value)
             }
         }
 
         // TODO SyncPush()
     }
 
-    fun loadProperties(){
-        Dav.Database.getPropertiesOfTableObject(id).observeForever {
-            this.propertiesData.value = it
+    suspend fun loadProperties(){
+        properties.clear()
+        for (property in Dav.Database.getPropertiesOfTableObject(id).await()){
+            properties.add(property)
         }
     }
 
-    fun getProperties() : ArrayList<Property>{
-        return propertiesData.value ?: ArrayList<Property>()
-    }
-
-    private fun addProperty(property: Property){
-        propertiesData.value?.add(property)
-    }
-
     fun getPropertyValue(name: String) : String?{
-        val property = getProperties().find { it.name == name }
+        val property = properties.find { it.name == name }
         return if(property != null) property.value else null
     }
 
     fun setPropertyValue(name: String, value: String){
-        val property = getProperties().find { it.name == name }
+        val property = properties.find { it.name == name }
 
         if(property != null){
             if(property.value == value) return
@@ -126,13 +110,13 @@ class TableObject{
             property.setPropertyValue(value)
         }else{
             // Create a new property
-            addProperty(Property(id, name, value))
+            properties.add(Property(id, name, value))
         }
 
         if(uploadStatus == TableObjectUploadStatus.UpToDate && !isFile)
             uploadStatus = TableObjectUploadStatus.Updated
 
-        save()
+        launch { save() }
         // TODO SyncPush()
     }
 

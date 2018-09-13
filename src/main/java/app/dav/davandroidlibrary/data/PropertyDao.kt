@@ -12,16 +12,13 @@ interface PropertyDao{
     fun insertProperty(property: PropertyEntity) : Long
 
     @Query("SELECT * FROM Property;")
-    fun getProperties(): LiveData<List<PropertyEntity>>
+    fun getProperties() : List<PropertyEntity>
 
     @Query("SELECT * FROM Property WHERE id == :id;")
-    fun getProperty(id: Long): LiveData<PropertyEntity>
+    fun getProperty(id: Long) : PropertyEntity
 
     @Query("SELECT * FROM Property WHERE table_object_id == :tableObjectId;")
-    fun getPropertiesOfTableObject(tableObjectId: Long): LiveData<List<PropertyEntity>>
-
-    @Query("SELECT * FROM Property WHERE table_object_id == :tableObjectId;")
-    fun getNonObservablePropertiesOfTableObject(tableObjectId: Long) : Array<PropertyEntity>
+    fun getPropertiesOfTableObject(tableObjectId: Long) : List<PropertyEntity>
 
     @Update()
     fun updateProperty(property: PropertyEntity)
