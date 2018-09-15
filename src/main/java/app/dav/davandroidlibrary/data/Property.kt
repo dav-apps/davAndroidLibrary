@@ -5,6 +5,7 @@ import android.arch.persistence.room.Entity
 import android.arch.persistence.room.ForeignKey
 import android.arch.persistence.room.PrimaryKey
 import app.dav.davandroidlibrary.Dav
+import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.launch
 
 @Entity(
@@ -34,17 +35,17 @@ class Property{
         this.name = name
         this.value = value
 
-        launch { save() }
+        GlobalScope.launch { save() }
     }
 
     fun setPropertyValue(value: String){
         this.value = value
-        launch { save() }
+        GlobalScope.launch { save() }
     }
 
     private suspend fun save(){
         // Check if the table object already exists
-        if(tableObjectId.equals(0)){
+        if(tableObjectId != 0L){
             if(!Dav.Database.propertyExists(id).await()){
                 Dav.Database.createProperty(this)
             }else{

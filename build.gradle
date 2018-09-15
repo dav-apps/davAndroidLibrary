@@ -47,7 +47,7 @@ dependencies {
     implementation "android.arch.lifecycle:extensions:" + lifecycleVersion
 
     // Kotlin Coroutines
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:0.24.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:0.26.0'
 }
 repositories {
     mavenCentral()

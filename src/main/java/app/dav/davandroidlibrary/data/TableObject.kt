@@ -3,6 +3,7 @@ package app.dav.davandroidlibrary.data
 import android.arch.persistence.room.Entity
 import android.arch.persistence.room.PrimaryKey
 import app.dav.davandroidlibrary.Dav
+import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.launch
 import java.io.File
 import java.util.*
@@ -27,6 +28,7 @@ class TableObject{
     var visibility: TableObjectVisibility = TableObjectVisibility.Private
     var uploadStatus: TableObjectUploadStatus = TableObjectUploadStatus.New
     var isFile: Boolean = false
+    var file: File? = null
     var etag: String = ""
     var properties = ArrayList<Property>()
 
@@ -35,21 +37,25 @@ class TableObject{
     constructor(tableId: Int){
         this.tableId = tableId
 
-        launch { save() }
+        GlobalScope.launch { save() }
     }
 
     constructor(uuid: UUID, tableId: Int){
         this.uuid = uuid
         this.tableId = tableId
 
-        launch { save() }
+        GlobalScope.launch { save() }
     }
 
     constructor(uuid: UUID, tableId: Int, file: File){
         this.uuid = uuid
         this.tableId = tableId
+        isFile = true
 
-        launch { save() }
+        GlobalScope.launch {
+            save()
+            saveFile(file)
+        }
     }
 
     constructor(uuid: UUID, tableId: Int, properties: ArrayList<Property>){
@@ -57,14 +63,13 @@ class TableObject{
         this.tableId = tableId
         for (p in properties) this.properties.add(p)
 
-        launch { saveWithProperties() }
+        GlobalScope.launch { saveWithProperties() }
     }
 
     private suspend fun save(){
         // Check if the table object already exists
         if(!Dav.Database.tableObjectExists(uuid).await()){
-            uploadStatus = TableObjectUploadStatus.New
-            Dav.Database.createTableObject(this)
+            id = Dav.Database.createTableObject(this).await()
         }else{
             Dav.Database.updateTableObject(this)
         }
@@ -73,7 +78,7 @@ class TableObject{
     private suspend fun saveWithProperties(){
         // Check if the table object already exists
         if(!Dav.Database.tableObjectExists(uuid).await()){
-            Dav.Database.createTableObjectWithProperties(this)
+            id = Dav.Database.createTableObjectWithProperties(this).await()
         }else{
             val tableObject = Dav.Database.getTableObject(uuid).await()
 
@@ -86,6 +91,22 @@ class TableObject{
         }
 
         // TODO SyncPush()
+    }
+
+    private suspend fun saveFile(file: File){
+        if(uploadStatus == TableObjectUploadStatus.UpToDate) uploadStatus = TableObjectUploadStatus.Updated
+
+        // Save the file in the data folder with the uuid as name (without extension)
+        val filename: String = uuid.toString()
+        val tableFolder = Dav.Database.getTableFolder(tableId)
+        val newFile = File(tableFolder.path + "/" + filename)
+        this.file = file.copyTo(newFile)
+
+        if(!file.extension.isEmpty()){
+            setPropertyValue("ext", file.extension)
+        }
+
+        save()
     }
 
     suspend fun loadProperties(){
@@ -116,7 +137,7 @@ class TableObject{
         if(uploadStatus == TableObjectUploadStatus.UpToDate && !isFile)
             uploadStatus = TableObjectUploadStatus.Updated
 
-        launch { save() }
+        GlobalScope.launch { save() }
         // TODO SyncPush()
     }
 
@@ -158,7 +179,7 @@ class TableObject{
                     tableObject.uploadStatus.uploadStatus,
                     tableObject.isFile,
                     tableObject.etag)
-            tableObjectEntity.id = tableObject.id
+            tableObjectEntity.id = if(tableObject.id == 0L) null else tableObject.id
             return tableObjectEntity
         }
     }
