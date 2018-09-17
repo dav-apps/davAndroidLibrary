@@ -109,10 +109,26 @@ class TableObject{
         save()
     }
 
+    suspend fun load(){
+        loadProperties()
+        loadFile()
+    }
+
     suspend fun loadProperties(){
         properties.clear()
         for (property in Dav.Database.getPropertiesOfTableObject(id).await()){
             properties.add(property)
+        }
+    }
+
+    fun loadFile(){
+        if(!isFile) return
+
+        val filePath: String = Dav.dataPath + tableId + "/" + uuid
+        val file = File(filePath)
+
+        if(file.exists()){
+            this.file = file
         }
     }
 

@@ -45,7 +45,11 @@ object Dav {
         fun getTableObject(uuid: UUID) : Deferred<TableObject?>{
             return GlobalScope.async {
                 val tableObjectEntity = database?.tableObjectDao()?.getTableObject(uuid.toString())
-                if(tableObjectEntity != null) TableObject.convertTableObjectEntityToTableObject(tableObjectEntity) else null
+                if(tableObjectEntity != null){
+                    val tableObject = TableObject.convertTableObjectEntityToTableObject(tableObjectEntity)
+                    tableObject.load()
+                    tableObject
+                }else null
             }
         }
 
@@ -57,7 +61,11 @@ object Dav {
 
                 for (obj in tableObjectEntities){
                     val tableObject = TableObject.convertTableObjectEntityToTableObject(obj)
-                    tableObject.loadProperties()
+
+                    if((!deleted && tableObject.uploadStatus == TableObjectUploadStatus.Deleted) ||
+                            tableObject.tableId != tableId) continue
+
+                    tableObject.load()
                     tableObjects.add(tableObject)
                 }
 
