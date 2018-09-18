@@ -1,11 +1,6 @@
 package app.dav.davandroidlibrary.data
 
-import android.arch.lifecycle.LiveData
-import android.arch.persistence.room.Dao
-import android.arch.persistence.room.Insert
-import android.arch.persistence.room.Query
-import android.arch.persistence.room.Update
-import java.util.*
+import android.arch.persistence.room.*
 
 @Dao
 interface TableObjectDao {
@@ -15,9 +10,6 @@ interface TableObjectDao {
     @Query("SELECT * FROM TableObject;")
     fun getTableObjects() : List<TableObjectEntity>
 
-    @Query("SELECT * FROM TableObject;")
-    fun getNonObservableTableObjects() : List<TableObjectEntity>
-
     @Query("SELECT * FROM TableObject WHERE id == :id;")
     fun getTableObject(id: Long) : TableObjectEntity
 
@@ -26,4 +18,7 @@ interface TableObjectDao {
 
     @Update()
     fun updateTableObject(tableObject: TableObjectEntity)
+
+    @Delete
+    fun deleteTableObject(tableObject: TableObjectEntity)
 }

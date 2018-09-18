@@ -56,7 +56,7 @@ object Dav {
         fun getAllTableObjects(tableId: Int, deleted: Boolean) : Deferred<ArrayList<TableObject>>{
             return GlobalScope.async {
                 val db = database
-                val tableObjectEntities = if(db != null) db.tableObjectDao().getNonObservableTableObjects() else listOf()
+                val tableObjectEntities = if(db != null) db.tableObjectDao().getTableObjects() else listOf()
                 val tableObjects = ArrayList<TableObject>()
 
                 for (obj in tableObjectEntities){
@@ -82,6 +82,25 @@ object Dav {
         fun tableObjectExists(uuid: UUID) : Deferred<Boolean>{
             return GlobalScope.async {
                 database?.tableObjectDao()?.getTableObject(uuid.toString()) != null
+            }
+        }
+
+        suspend fun deleteTableObject(uuid: UUID){
+            val tableObject = getTableObject(uuid).await() ?: return
+
+            if(tableObject.uploadStatus == TableObjectUploadStatus.Deleted){
+                deleteTableObjectImmediately(uuid)
+            }else{
+                tableObject.changeUploadStatus(TableObjectUploadStatus.Deleted)
+            }
+        }
+
+        suspend fun deleteTableObjectImmediately(uuid: UUID){
+            val tableObject = getTableObject(uuid).await() ?: return
+
+            GlobalScope.launch {
+                val tableObjectEntity = TableObject.convertTableObjectToTableObjectEntity(tableObject)
+                database?.tableObjectDao()?.deleteTableObject(tableObjectEntity)
             }
         }
 

@@ -11,7 +11,7 @@ import kotlinx.coroutines.experimental.launch
 @Entity(
         tableName = "Property",
         foreignKeys = [
-            ForeignKey(entity = TableObjectEntity::class, parentColumns = ["id"], childColumns = ["table_object_id"])
+            ForeignKey(entity = TableObjectEntity::class, parentColumns = ["id"], childColumns = ["table_object_id"], onDelete = ForeignKey.CASCADE)
         ]
 )
 data class PropertyEntity(

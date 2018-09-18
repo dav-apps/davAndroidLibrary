@@ -2,6 +2,7 @@ package app.dav.davandroidlibrary.data
 
 import android.arch.persistence.room.Entity
 import android.arch.persistence.room.PrimaryKey
+import android.util.Log
 import app.dav.davandroidlibrary.Dav
 import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.launch
@@ -159,6 +160,40 @@ class TableObject{
 
         GlobalScope.launch { save() }
         // TODO SyncPush()
+    }
+
+    fun changeUploadStatus(uploadStatus: TableObjectUploadStatus){
+        if(uploadStatus == this.uploadStatus) return
+
+        this.uploadStatus = uploadStatus
+        GlobalScope.launch { save() }
+    }
+
+    fun delete(){
+        val jwt = null    // TODO DavUser.getJWT()
+
+        if(jwt == null){
+            GlobalScope.launch { deleteImmediately() }
+            uploadStatus = TableObjectUploadStatus.Deleted
+        }else{
+            val file = this.file
+            if(file != null){
+                if(isFile && file.exists()){
+                    file.delete()
+                }
+            }
+
+            changeUploadStatus(TableObjectUploadStatus.Deleted)
+            // TODO SyncPush()
+        }
+    }
+
+    suspend fun deleteImmediately(){
+        if(isFile && file != null){
+            file?.delete()
+        }
+
+        Dav.Database.deleteTableObjectImmediately(uuid)
     }
 
     companion object {
