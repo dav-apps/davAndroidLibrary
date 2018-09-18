@@ -93,6 +93,10 @@ class TableObject{
         // TODO SyncPush()
     }
 
+    suspend fun setFile(file: File){
+        saveFile(file)
+    }
+
     private suspend fun saveFile(file: File){
         if(uploadStatus == TableObjectUploadStatus.UpToDate) uploadStatus = TableObjectUploadStatus.Updated
 
