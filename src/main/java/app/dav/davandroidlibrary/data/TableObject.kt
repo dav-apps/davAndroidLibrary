@@ -2,10 +2,7 @@ package app.dav.davandroidlibrary.data
 
 import android.arch.persistence.room.Entity
 import android.arch.persistence.room.PrimaryKey
-import android.util.Log
 import app.dav.davandroidlibrary.Dav
-import kotlinx.coroutines.experimental.GlobalScope
-import kotlinx.coroutines.experimental.launch
 import java.io.File
 import java.util.*
 import kotlin.collections.ArrayList
@@ -37,34 +34,17 @@ class TableObject{
 
     constructor(tableId: Int){
         this.tableId = tableId
-
-        GlobalScope.launch { save() }
     }
 
     constructor(uuid: UUID, tableId: Int){
         this.uuid = uuid
         this.tableId = tableId
-
-        GlobalScope.launch { save() }
-    }
-
-    constructor(uuid: UUID, tableId: Int, file: File){
-        this.uuid = uuid
-        this.tableId = tableId
-        isFile = true
-
-        GlobalScope.launch {
-            save()
-            saveFile(file)
-        }
     }
 
     constructor(uuid: UUID, tableId: Int, properties: ArrayList<Property>){
         this.uuid = uuid
         this.tableId = tableId
         for (p in properties) this.properties.add(p)
-
-        GlobalScope.launch { saveWithProperties() }
     }
 
     private suspend fun save(){
@@ -105,7 +85,7 @@ class TableObject{
         val filename: String = uuid.toString()
         val tableFolder = Dav.Database.getTableFolder(tableId)
         val newFile = File(tableFolder.path + "/" + filename)
-        this.file = file.copyTo(newFile)
+        this.file = file.copyTo(newFile, true)
 
         if(!file.extension.isEmpty()){
             setPropertyValue("ext", file.extension)
@@ -142,7 +122,7 @@ class TableObject{
         return if(property != null) property.value else null
     }
 
-    fun setPropertyValue(name: String, value: String){
+    suspend fun setPropertyValue(name: String, value: String){
         val property = properties.find { it.name == name }
 
         if(property != null){
@@ -158,22 +138,22 @@ class TableObject{
         if(uploadStatus == TableObjectUploadStatus.UpToDate && !isFile)
             uploadStatus = TableObjectUploadStatus.Updated
 
-        GlobalScope.launch { save() }
+        save()
         // TODO SyncPush()
     }
 
-    fun changeUploadStatus(uploadStatus: TableObjectUploadStatus){
+    suspend fun changeUploadStatus(uploadStatus: TableObjectUploadStatus){
         if(uploadStatus == this.uploadStatus) return
 
         this.uploadStatus = uploadStatus
-        GlobalScope.launch { save() }
+        save()
     }
 
-    fun delete(){
+    suspend fun delete(){
         val jwt = null    // TODO DavUser.getJWT()
 
         if(jwt == null){
-            GlobalScope.launch { deleteImmediately() }
+            deleteImmediately()
             uploadStatus = TableObjectUploadStatus.Deleted
         }else{
             val file = this.file
@@ -197,6 +177,32 @@ class TableObject{
     }
 
     companion object {
+        suspend fun create(tableId: Int) : TableObject{
+            val tableObject = TableObject(tableId)
+            tableObject.save()
+            return tableObject
+        }
+
+        suspend fun create(uuid: UUID, tableId: Int) : TableObject{
+            val tableObject = TableObject(uuid, tableId)
+            tableObject.save()
+            return tableObject
+        }
+
+        suspend fun create(uuid: UUID, tableId: Int, file: File) : TableObject{
+            val tableObject = TableObject(uuid, tableId)
+            tableObject.isFile = true
+            tableObject.save()
+            tableObject.saveFile(file)
+            return tableObject
+        }
+
+        suspend fun create(uuid: UUID, tableId: Int, properties: ArrayList<Property>) : TableObject{
+            val tableObject = TableObject(uuid, tableId, properties)
+            tableObject.saveWithProperties()
+            return tableObject
+        }
+
         fun convertIntToVisibility(visibility: Int) : TableObjectVisibility{
             return when(visibility){
                 2 -> TableObjectVisibility.Public

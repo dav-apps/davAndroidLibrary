@@ -5,7 +5,6 @@ import app.dav.davandroidlibrary.data.*
 import kotlinx.coroutines.experimental.Deferred
 import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.async
-import kotlinx.coroutines.experimental.launch
 import java.io.File
 import java.util.*
 import kotlin.collections.ArrayList
@@ -73,10 +72,8 @@ object Dav {
             }
         }
 
-        fun updateTableObject(tableObject: TableObject){
-            GlobalScope.launch {
-                database?.tableObjectDao()?.updateTableObject(TableObject.convertTableObjectToTableObjectEntity(tableObject))
-            }
+        suspend fun updateTableObject(tableObject: TableObject){
+            GlobalScope.async { database?.tableObjectDao()?.updateTableObject(TableObject.convertTableObjectToTableObjectEntity(tableObject)) }.await()
         }
 
         fun tableObjectExists(uuid: UUID) : Deferred<Boolean>{
@@ -97,17 +94,12 @@ object Dav {
 
         suspend fun deleteTableObjectImmediately(uuid: UUID){
             val tableObject = getTableObject(uuid).await() ?: return
-
-            GlobalScope.launch {
-                val tableObjectEntity = TableObject.convertTableObjectToTableObjectEntity(tableObject)
-                database?.tableObjectDao()?.deleteTableObject(tableObjectEntity)
-            }
+            val tableObjectEntity = TableObject.convertTableObjectToTableObjectEntity(tableObject)
+            GlobalScope.async { database?.tableObjectDao()?.deleteTableObject(tableObjectEntity) }.await()
         }
 
-        fun createProperty(property: Property){
-            GlobalScope.launch {
-                database?.propertyDao()?.insertProperty(Property.convertPropertyToPropertyEntity(property))
-            }
+        suspend fun createProperty(property: Property){
+            GlobalScope.async { database?.propertyDao()?.insertProperty(Property.convertPropertyToPropertyEntity(property)) }.await()
         }
 
         fun getPropertiesOfTableObject(tableObjectId: Long) : Deferred<ArrayList<Property>>{
@@ -125,10 +117,8 @@ object Dav {
             }
         }
 
-        fun updateProperty(property: Property){
-            GlobalScope.launch {
-                database?.propertyDao()?.updateProperty(Property.convertPropertyToPropertyEntity(property))
-            }
+        suspend fun updateProperty(property: Property){
+            GlobalScope.async { database?.propertyDao()?.updateProperty(Property.convertPropertyToPropertyEntity(property)) }.await()
         }
 
         fun propertyExists(id: Long) : Deferred<Boolean>{
