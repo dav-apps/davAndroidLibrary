@@ -1,4 +1,4 @@
-package app.dav.davandroidlibrary.data
+package app.dav.davandroidlibrary.models
 
 import android.arch.persistence.room.ColumnInfo
 import android.arch.persistence.room.Entity
@@ -28,14 +28,12 @@ class Property{
     var name: String = ""
     var value: String = ""
 
-    constructor(){}
+    constructor()
 
     constructor(tableObjectId: Long, name: String, value: String){
         this.tableObjectId = tableObjectId
         this.name = name
         this.value = value
-
-        GlobalScope.launch { save() }
     }
 
     fun setPropertyValue(value: String){
@@ -55,7 +53,13 @@ class Property{
     }
 
     companion object {
-        fun convertPropertyEntityToProperty(propertyEntity: PropertyEntity) : Property{
+        suspend fun create(tableObjectId: Long, name: String, value: String) : Property{
+            val property = Property(tableObjectId, name, value)
+            property.save()
+            return property
+        }
+
+        fun convertPropertyEntityToProperty(propertyEntity: PropertyEntity) : Property {
             val property = Property()
             property.id = propertyEntity.id ?: 0
             property.tableObjectId = propertyEntity.tableObjectId
@@ -64,7 +68,7 @@ class Property{
             return property
         }
 
-        fun convertPropertyToPropertyEntity(property: Property) : PropertyEntity{
+        fun convertPropertyToPropertyEntity(property: Property) : PropertyEntity {
             val propertyEntity = PropertyEntity(property.tableObjectId,
                     property.name,
                     property.value)

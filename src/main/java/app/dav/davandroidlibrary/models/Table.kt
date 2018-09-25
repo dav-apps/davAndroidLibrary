@@ -1,6 +1,4 @@
-package app.dav.davandroidlibrary.data
-
-import android.arch.persistence.room.Entity
+package app.dav.davandroidlibrary.models
 
 class Table(
         val id: Int,

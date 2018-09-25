@@ -3,9 +3,10 @@ package app.dav.davandroidlibrary.data
 import android.arch.persistence.room.Database
 import android.arch.persistence.room.Room
 import android.arch.persistence.room.RoomDatabase
-import android.arch.persistence.room.TypeConverters
 import android.content.Context
 import app.dav.davandroidlibrary.Dav.DATABASE_NAME
+import app.dav.davandroidlibrary.models.PropertyEntity
+import app.dav.davandroidlibrary.models.TableObjectEntity
 
 @Database(entities = [TableObjectEntity::class, PropertyEntity::class], version = 1)
 abstract class DavDatabase : RoomDatabase() {

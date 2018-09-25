@@ -1,7 +1,8 @@
 package app.dav.davandroidlibrary
 
 import android.content.Context
-import app.dav.davandroidlibrary.data.*
+import app.dav.davandroidlibrary.data.DavDatabase
+import app.dav.davandroidlibrary.models.*
 import kotlinx.coroutines.experimental.Deferred
 import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.async
@@ -10,7 +11,7 @@ import java.util.*
 import kotlin.collections.ArrayList
 
 object Dav {
-    const val apiBaseUrl = "https://dav-backend.herokuapp.com/v1/"
+    const val API_BASE_URL = "https://dav-backend.herokuapp.com/v1/"
     const val DATABASE_NAME = "dav.db"
     var database: DavDatabase? = null
     var dataPath: String = ""

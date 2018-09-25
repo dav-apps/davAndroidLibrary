@@ -1,4 +1,4 @@
-package app.dav.davandroidlibrary.data
+package app.dav.davandroidlibrary.models
 
 import android.arch.persistence.room.Entity
 import android.arch.persistence.room.PrimaryKey
@@ -132,7 +132,7 @@ class TableObject{
             property.setPropertyValue(value)
         }else{
             // Create a new property
-            properties.add(Property(id, name, value))
+            properties.add(Property.create(id, name, value))
         }
 
         if(uploadStatus == TableObjectUploadStatus.UpToDate && !isFile)
@@ -177,19 +177,19 @@ class TableObject{
     }
 
     companion object {
-        suspend fun create(tableId: Int) : TableObject{
+        suspend fun create(tableId: Int) : TableObject {
             val tableObject = TableObject(tableId)
             tableObject.save()
             return tableObject
         }
 
-        suspend fun create(uuid: UUID, tableId: Int) : TableObject{
+        suspend fun create(uuid: UUID, tableId: Int) : TableObject {
             val tableObject = TableObject(uuid, tableId)
             tableObject.save()
             return tableObject
         }
 
-        suspend fun create(uuid: UUID, tableId: Int, file: File) : TableObject{
+        suspend fun create(uuid: UUID, tableId: Int, file: File) : TableObject {
             val tableObject = TableObject(uuid, tableId)
             tableObject.isFile = true
             tableObject.save()
@@ -197,13 +197,13 @@ class TableObject{
             return tableObject
         }
 
-        suspend fun create(uuid: UUID, tableId: Int, properties: ArrayList<Property>) : TableObject{
+        suspend fun create(uuid: UUID, tableId: Int, properties: ArrayList<Property>) : TableObject {
             val tableObject = TableObject(uuid, tableId, properties)
             tableObject.saveWithProperties()
             return tableObject
         }
 
-        fun convertIntToVisibility(visibility: Int) : TableObjectVisibility{
+        fun convertIntToVisibility(visibility: Int) : TableObjectVisibility {
             return when(visibility){
                 2 -> TableObjectVisibility.Public
                 1 -> TableObjectVisibility.Protected
@@ -211,7 +211,7 @@ class TableObject{
             }
         }
 
-        fun convertIntToUploadStatus(uploadStatus: Int) : TableObjectUploadStatus{
+        fun convertIntToUploadStatus(uploadStatus: Int) : TableObjectUploadStatus {
             return when(uploadStatus){
                 4 -> TableObjectUploadStatus.NoUpload
                 3 -> TableObjectUploadStatus.Deleted
@@ -221,19 +221,19 @@ class TableObject{
             }
         }
 
-        fun convertTableObjectEntityToTableObject(obj: TableObjectEntity) : TableObject{
+        fun convertTableObjectEntityToTableObject(obj: TableObjectEntity) : TableObject {
             val tableObject = TableObject()
             tableObject.id = obj.id ?: 0
             tableObject.tableId = obj.tableId
             tableObject.uuid = UUID.fromString(obj.uuid)
-            tableObject.visibility = TableObject.convertIntToVisibility(obj.visibility)
-            tableObject.uploadStatus = TableObject.convertIntToUploadStatus(obj.uploadStatus)
+            tableObject.visibility = convertIntToVisibility(obj.visibility)
+            tableObject.uploadStatus = convertIntToUploadStatus(obj.uploadStatus)
             tableObject.isFile = obj.isFile
             tableObject.etag = obj.etag
             return tableObject
         }
 
-        fun convertTableObjectToTableObjectEntity(tableObject: TableObject) : TableObjectEntity{
+        fun convertTableObjectToTableObjectEntity(tableObject: TableObject) : TableObjectEntity {
             val tableObjectEntity = TableObjectEntity(tableObject.tableId,
                     tableObject.uuid.toString(),
                     tableObject.visibility.visibility,
