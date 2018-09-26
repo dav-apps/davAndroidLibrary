@@ -99,14 +99,14 @@ class TableObject{
         loadFile()
     }
 
-    suspend fun loadProperties(){
+    private suspend fun loadProperties(){
         properties.clear()
         for (property in Dav.Database.getPropertiesOfTableObject(id).await()){
             properties.add(property)
         }
     }
 
-    fun loadFile(){
+    private fun loadFile(){
         if(!isFile) return
 
         val filePath: String = Dav.dataPath + tableId + "/" + uuid

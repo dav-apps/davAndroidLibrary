@@ -5,8 +5,6 @@ import android.arch.persistence.room.Entity
 import android.arch.persistence.room.ForeignKey
 import android.arch.persistence.room.PrimaryKey
 import app.dav.davandroidlibrary.Dav
-import kotlinx.coroutines.experimental.GlobalScope
-import kotlinx.coroutines.experimental.launch
 
 @Entity(
         tableName = "Property",
@@ -36,9 +34,9 @@ class Property{
         this.value = value
     }
 
-    fun setPropertyValue(value: String){
+    suspend fun setPropertyValue(value: String){
         this.value = value
-        GlobalScope.launch { save() }
+        save()
     }
 
     private suspend fun save(){
