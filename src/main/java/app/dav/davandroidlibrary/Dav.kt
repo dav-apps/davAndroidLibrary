@@ -139,3 +139,9 @@ object Dav {
         }
     }
 }
+
+enum class DavEnvironment(val environment: Int){
+    Development(0),
+    Test(1),
+    Production(2)
+}
