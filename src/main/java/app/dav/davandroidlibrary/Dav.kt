@@ -1,14 +1,20 @@
 package app.dav.davandroidlibrary
 
 import android.content.Context
+import android.util.Log
+import app.dav.davandroidlibrary.common.ProjectInterface
 import app.dav.davandroidlibrary.data.DavDatabase
 import app.dav.davandroidlibrary.models.*
 import kotlinx.coroutines.experimental.Deferred
 import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.async
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
+import java.io.IOException
 import java.util.*
 import kotlin.collections.ArrayList
+
 
 object Dav {
     const val API_BASE_URL = "https://dav-backend.herokuapp.com/v1/"
@@ -16,6 +22,10 @@ object Dav {
     var database: DavDatabase? = null
     var dataPath: String = ""
 
+    // Other constants
+    const val getUserUrl = "auth/user"
+
+    // Keys for Sharing Preferences
     const val jwtKey = "dav.jwt"
     const val emailKey = "dav.email"
     const val usernameKey = "dav.username"
@@ -27,6 +37,32 @@ object Dav {
     fun init(context: Context, dataPath: String){
         database = DavDatabase.getInstance(context)
         this.dataPath = dataPath
+    }
+
+    object DataManager{
+        fun httpGet(jwt: String, url: String) : HttpResultEntry{
+            val noInternetEntry = HttpResultEntry(false, "No internet connection")
+            val isNetworkAvailable = ProjectInterface.generalMethods?.isNetworkAvailable() ?: return noInternetEntry
+            if(!isNetworkAvailable) return noInternetEntry
+
+            val client = OkHttpClient()
+            val request = Request.Builder()
+                    .url(API_BASE_URL + url)
+                    .header("Authorization", jwt)
+                    .build()
+
+            try {
+                val response = client.newCall(request).execute()
+                if(response.isSuccessful){
+                    return HttpResultEntry(true, response.body()?.string() ?: "")
+                }else{
+                    Log.d("Dav.DataManager", response.body()?.string())
+                    return HttpResultEntry(false, "There was an error")
+                }
+            }catch (e: IOException){
+                return HttpResultEntry(false, e.message ?: "There was an error")
+            }
+        }
     }
 
     object Database{
@@ -153,3 +189,5 @@ enum class DavEnvironment(val environment: Int){
     Test(1),
     Production(2)
 }
+
+class HttpResultEntry(override val key: Boolean, override val value: String) : Map.Entry<Boolean, String>
