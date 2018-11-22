@@ -16,6 +16,14 @@ object Dav {
     var database: DavDatabase? = null
     var dataPath: String = ""
 
+    const val jwtKey = "dav.jwt"
+    const val emailKey = "dav.email"
+    const val usernameKey = "dav.username"
+    const val totalStorageKey = "dav.totalStorage"
+    const val usedStorageKey = "dav.usedStorage"
+    const val planKey = "dav.plan"
+    const val avatarEtagKey = "dav.avatarEtag"
+
     fun init(context: Context, dataPath: String){
         database = DavDatabase.getInstance(context)
         this.dataPath = dataPath
