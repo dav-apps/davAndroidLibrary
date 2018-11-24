@@ -1,8 +1,19 @@
 package app.dav.davandroidlibrary.models
 
+import android.util.Log
 import app.dav.davandroidlibrary.Dav
 import app.dav.davandroidlibrary.common.ProjectInterface
+import com.beust.klaxon.Klaxon
+import kotlinx.coroutines.experimental.GlobalScope
+import kotlinx.coroutines.experimental.async
+import kotlinx.coroutines.experimental.launch
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
+import java.io.InputStream
+
+private const val avatarFileName = "avatar.png"
+private val avatarFilePath = Dav.dataPath + avatarFileName
 
 class DavUser{
     var email: String
@@ -20,7 +31,7 @@ class DavUser{
     var plan: DavPlan
         get() = getPlanFromSettings()
         set(value) = setPlanInSettings(value)
-    var avatar: File? = null
+    var avatar: File = File(avatarFilePath)
     var avatarEtag: String
         get() = getAvatarEtagFromSettings()
         set(value) = setAvatarEtagInSettings(value)
@@ -31,23 +42,103 @@ class DavUser{
 
     constructor(){
         // Get the user information from the local settings
-        if(!getJwtFromSettings().isEmpty()){
+        if(!jwt.isEmpty()){
             // User is logged in. Get the user information
-            getUserInformation()
+            isLoggedIn = true
 
-
+            GlobalScope.launch {
+                downloadUserInformation()
+                // TODO Sync
+            }
         }else{
             isLoggedIn = false
         }
     }
 
-    private fun downloadUserInformation(){
-
+    suspend fun login(jwt: String){
+        this.jwt = jwt
+        isLoggedIn = true
+        if(downloadUserInformation())
+            // TODO Sync
+        else
+            logout()
     }
 
-    private fun getUserInformation(){
-        isLoggedIn = true
-        // TODO avatar = getAvatar
+    fun logout(){
+        // Clear all values
+        isLoggedIn = false
+        jwt = ""
+        email = ""
+        username = ""
+        totalStorage = 0
+        usedStorage = 0
+        plan = DavPlan.Free
+        avatarEtag = ""
+
+        // Delete the avatar
+        deleteAvatar()
+    }
+
+    private fun deleteAvatar(){
+        val avatarFile = File(avatarFilePath)
+        if(avatarFile.exists())
+            avatarFile.delete()
+    }
+
+    private suspend fun downloadUserInformation() : Boolean{
+        if(!isLoggedIn) return false
+        val getResult = Dav.DataManager.httpGet(jwt, Dav.getUserUrl)
+
+        if(getResult.key){
+            val json = Klaxon().parse<DavUserData>(getResult.value) ?: return false
+            email = json.email
+            username = json.username
+            totalStorage = json.total_storage
+            usedStorage = json.used_storage
+            plan = convertIntToDavPlan(json.plan)
+            val newAvatarEtag = json.avatar_etag
+            val avatarUrl = json.avatar
+
+            val avatarFile = File(avatarFilePath)
+
+            if(avatarEtag != newAvatarEtag || !avatarFile.exists()){
+                // Download the avatar
+                downloadAvatar(avatarUrl)
+            }
+
+            if(avatarFile.exists()){
+                avatar = avatarFile
+                avatarEtag = newAvatarEtag
+            }
+
+            return true
+        }else{
+            Log.e("DavUser", getResult.value)
+            return false
+        }
+    }
+
+    private suspend fun downloadAvatar(avatarUrl: String){
+        GlobalScope.async {
+            val client = OkHttpClient()
+            val request = Request.Builder()
+                    .url(avatarUrl)
+                    .build()
+
+            // Get the image
+            val response = client.newCall(request).execute()
+            val byteStream: InputStream = response.body()?.byteStream() ?: return@async
+            val file = File(avatarFilePath)
+            file.copyInputStreamToFile(byteStream)
+        }.await()
+    }
+
+    private fun File.copyInputStreamToFile(inputStream: InputStream) {
+        inputStream.use { input ->
+            this.outputStream().use { fileOut ->
+                input.copyTo(fileOut)
+            }
+        }
     }
 
     private fun getEmailFromSettings() : String{
@@ -112,9 +203,26 @@ class DavUser{
     private fun setJwtInSettings(value: String){
         ProjectInterface.localDataSettings?.setStringValue(Dav.jwtKey, value)
     }
+
+    companion object {
+        private fun convertIntToDavPlan(plan: Int) : DavPlan{
+            return when(plan){
+                1 -> DavPlan.Plus
+                else -> DavPlan.Free
+            }
+        }
+    }
 }
 
 enum class DavPlan(val plan: Int){
     Free(0),
     Plus(1)
 }
+
+data class DavUserData(val email: String,
+                       val username: String,
+                       val total_storage: Long,
+                       val used_storage: Long,
+                       val plan: Int,
+                       val avatar: String,
+                       val avatar_etag: String)
