@@ -1,7 +1,6 @@
 package app.dav.davandroidlibrary
 
 import android.content.Context
-import android.util.Log
 import app.dav.davandroidlibrary.common.ProjectInterface
 import app.dav.davandroidlibrary.data.DavDatabase
 import app.dav.davandroidlibrary.models.*
@@ -40,7 +39,7 @@ object Dav {
     }
 
     object DataManager{
-        fun httpGet(jwt: String, url: String) : HttpResultEntry{
+        suspend fun httpGet(jwt: String, url: String) : HttpResultEntry{
             val noInternetEntry = HttpResultEntry(false, "No internet connection")
             val isNetworkAvailable = ProjectInterface.generalMethods?.isNetworkAvailable() ?: return noInternetEntry
             if(!isNetworkAvailable) return noInternetEntry
@@ -52,13 +51,15 @@ object Dav {
                     .build()
 
             try {
-                val response = client.newCall(request).execute()
-                if(response.isSuccessful){
-                    return HttpResultEntry(true, response.body()?.string() ?: "")
-                }else{
-                    Log.d("Dav.DataManager", response.body()?.string())
-                    return HttpResultEntry(false, "There was an error")
-                }
+                return GlobalScope.async {
+                    val response = client.newCall(request).execute()
+
+                    if(response.isSuccessful){
+                        HttpResultEntry(true, response.body()?.string() ?: "")
+                    }else{
+                        HttpResultEntry(false, "There was an error")
+                    }
+                }.await()
             }catch (e: IOException){
                 return HttpResultEntry(false, e.message ?: "There was an error")
             }
