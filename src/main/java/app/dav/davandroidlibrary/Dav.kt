@@ -7,10 +7,7 @@ import app.dav.davandroidlibrary.models.*
 import kotlinx.coroutines.experimental.Deferred
 import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.async
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import java.io.File
-import java.io.IOException
 import java.util.*
 import kotlin.collections.ArrayList
 
@@ -21,7 +18,8 @@ object Dav {
     val apiBaseUrl = if(environment == DavEnvironment.Production) apiBaseUrlProduction else apiBaseUrlDevelopment
     const val databaseName = "dav.db"
     var database: DavDatabase? = null
-    var dataPath: String = ""
+    val dataPath: String
+        get() = ProjectInterface.retrieveConstants?.getDataPath() ?: ""
 
     val environment: DavEnvironment
         get() = ProjectInterface.generalMethods?.getEnvironment() ?: DavEnvironment.Development
@@ -38,37 +36,8 @@ object Dav {
     const val planKey = "dav.plan"
     const val avatarEtagKey = "dav.avatarEtag"
 
-    fun init(context: Context, dataPath: String){
+    fun init(context: Context){
         database = DavDatabase.getInstance(context)
-        this.dataPath = dataPath
-    }
-
-    object DataManager{
-        suspend fun httpGet(jwt: String, url: String) : HttpResultEntry{
-            val noInternetEntry = HttpResultEntry(false, "No internet connection")
-            val isNetworkAvailable = ProjectInterface.generalMethods?.isNetworkAvailable() ?: return noInternetEntry
-            if(!isNetworkAvailable) return noInternetEntry
-
-            val client = OkHttpClient()
-            val request = Request.Builder()
-                    .url(apiBaseUrl + url)
-                    .header("Authorization", jwt)
-                    .build()
-
-            try {
-                return GlobalScope.async {
-                    val response = client.newCall(request).execute()
-
-                    if(response.isSuccessful){
-                        HttpResultEntry(true, response.body()?.string() ?: "")
-                    }else{
-                        HttpResultEntry(false, "There was an error")
-                    }
-                }.await()
-            }catch (e: IOException){
-                return HttpResultEntry(false, e.message ?: "There was an error")
-            }
-        }
     }
 
     object Database{
