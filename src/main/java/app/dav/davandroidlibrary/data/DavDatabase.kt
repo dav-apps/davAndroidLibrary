@@ -4,7 +4,7 @@ import android.arch.persistence.room.Database
 import android.arch.persistence.room.Room
 import android.arch.persistence.room.RoomDatabase
 import android.content.Context
-import app.dav.davandroidlibrary.Dav.DATABASE_NAME
+import app.dav.davandroidlibrary.Dav.databaseName
 import app.dav.davandroidlibrary.models.PropertyEntity
 import app.dav.davandroidlibrary.models.TableObjectEntity
 
@@ -24,7 +24,7 @@ abstract class DavDatabase : RoomDatabase() {
         }
 
         private fun buildDatabase(context: Context): DavDatabase {
-            return Room.databaseBuilder(context, DavDatabase::class.java, DATABASE_NAME).build()
+            return Room.databaseBuilder(context, DavDatabase::class.java, databaseName).build()
         }
     }
 }

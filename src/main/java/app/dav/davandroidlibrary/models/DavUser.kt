@@ -103,7 +103,7 @@ class DavUser{
 
             if(avatarEtag != newAvatarEtag || !avatarFile.exists()){
                 // Download the avatar
-                downloadAvatar(avatarUrl)
+                GlobalScope.launch { downloadAvatar(avatarUrl) }
             }
 
             if(avatarFile.exists()){
@@ -119,18 +119,22 @@ class DavUser{
     }
 
     private suspend fun downloadAvatar(avatarUrl: String){
-        GlobalScope.async {
-            val client = OkHttpClient()
-            val request = Request.Builder()
-                    .url(avatarUrl)
-                    .build()
+        try{
+            GlobalScope.async {
+                val client = OkHttpClient()
+                val request = Request.Builder()
+                        .url(avatarUrl)
+                        .build()
 
-            // Get the image
-            val response = client.newCall(request).execute()
-            val byteStream: InputStream = response.body()?.byteStream() ?: return@async
-            val file = File(avatarFilePath)
-            file.copyInputStreamToFile(byteStream)
-        }.await()
+                // Get the image
+                val response = client.newCall(request).execute()
+                val byteStream: InputStream = response.body()?.byteStream() ?: return@async
+                val file = File(avatarFilePath)
+                file.copyInputStreamToFile(byteStream)
+            }.await()
+        }catch (e: Exception){
+            Log.d("DavUser", "There was an error when downloading the avatar: ${e.message}")
+        }
     }
 
     private fun File.copyInputStreamToFile(inputStream: InputStream) {

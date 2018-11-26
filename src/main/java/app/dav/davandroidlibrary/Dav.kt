@@ -16,10 +16,15 @@ import kotlin.collections.ArrayList
 
 
 object Dav {
-    const val API_BASE_URL = "https://dav-backend.herokuapp.com/v1/"
-    const val DATABASE_NAME = "dav.db"
+    private const val apiBaseUrlProduction = "https://dav-backend.herokuapp.com/v1/"
+    private const val apiBaseUrlDevelopment = "https://e745809a.ngrok.io/v1/"
+    val apiBaseUrl = if(environment == DavEnvironment.Production) apiBaseUrlProduction else apiBaseUrlDevelopment
+    const val databaseName = "dav.db"
     var database: DavDatabase? = null
     var dataPath: String = ""
+
+    val environment: DavEnvironment
+        get() = ProjectInterface.generalMethods?.getEnvironment() ?: DavEnvironment.Development
 
     // Other constants
     const val getUserUrl = "auth/user"
@@ -46,7 +51,7 @@ object Dav {
 
             val client = OkHttpClient()
             val request = Request.Builder()
-                    .url(API_BASE_URL + url)
+                    .url(apiBaseUrl + url)
                     .header("Authorization", jwt)
                     .build()
 
