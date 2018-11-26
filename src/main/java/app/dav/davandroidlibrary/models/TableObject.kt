@@ -243,6 +243,28 @@ class TableObject{
             tableObjectEntity.id = if(tableObject.id == 0L) null else tableObject.id
             return tableObjectEntity
         }
+
+        internal fun convertTableObjectDataToTableObject(tableObjectData: TableObjectData) : TableObject{
+            val tableObject = TableObject()
+            tableObject.id = tableObjectData.id
+            tableObject.tableId = tableObjectData.table_id
+            tableObject.visibility = convertIntToVisibility(tableObjectData.visibility)
+            tableObject.uuid = tableObjectData.uuid
+            tableObject.isFile = tableObjectData.file
+            tableObject.etag = tableObjectData.etag
+
+            val properties = ArrayList<Property>()
+
+            for(key in tableObjectData.properties.keys()){
+                val property = Property()
+                property.name = key
+                property.value = tableObjectData.properties.get(key)
+                properties.add(property)
+            }
+
+            tableObject.properties = properties
+            return tableObject
+        }
     }
 }
 
@@ -259,3 +281,13 @@ enum class TableObjectUploadStatus(val uploadStatus: Int){
     Deleted(3),
     NoUpload(4)
 }
+
+internal data class TableObjectData(
+        var id: Long,
+        val table_id: Int,
+        val visibility: Int,
+        val uuid: UUID,
+        val file: Boolean,
+        val properties: Dictionary<String, String>,
+        val etag: String
+)
