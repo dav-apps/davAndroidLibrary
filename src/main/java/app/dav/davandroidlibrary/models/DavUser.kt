@@ -3,6 +3,7 @@ package app.dav.davandroidlibrary.models
 import android.util.Log
 import app.dav.davandroidlibrary.Dav
 import app.dav.davandroidlibrary.common.ProjectInterface
+import app.dav.davandroidlibrary.data.DataManager
 import com.beust.klaxon.Klaxon
 import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.async
@@ -87,7 +88,7 @@ class DavUser{
 
     private suspend fun downloadUserInformation() : Boolean{
         if(!isLoggedIn) return false
-        val getResult = Dav.DataManager.httpGet(jwt, Dav.getUserUrl)
+        val getResult = DataManager.httpGet(jwt, Dav.getUserUrl)
 
         if(getResult.key){
             val json = Klaxon().parse<DavUserData>(getResult.value) ?: return false
@@ -145,75 +146,75 @@ class DavUser{
         }
     }
 
-    private fun getEmailFromSettings() : String{
-        val localDataSettings = ProjectInterface.localDataSettings ?: return ""
-        return localDataSettings.getStringValue(Dav.emailKey, "")
-    }
-
-    private fun getUsernameFromSettings() : String{
-        val localDataSettings = ProjectInterface.localDataSettings ?: return ""
-        return localDataSettings.getStringValue(Dav.usernameKey, "")
-    }
-
-    private fun getTotalStorageFromSettings() : Long{
-        val localDataSettings = ProjectInterface.localDataSettings ?: return 0
-        return localDataSettings.getLongValue(Dav.totalStorageKey, 0)
-    }
-
-    private fun getUsedStorageFromSettings() : Long{
-        val localDataSettings = ProjectInterface.localDataSettings ?: return 0
-        return localDataSettings.getLongValue(Dav.usedStorageKey, 0)
-    }
-
-    private fun getPlanFromSettings() : DavPlan{
-        val localDataSettings = ProjectInterface.localDataSettings ?: return DavPlan.Free
-        return if(localDataSettings.getIntValue(Dav.planKey, 0) == 1) DavPlan.Plus else DavPlan.Free
-    }
-
-    private fun getAvatarEtagFromSettings() : String{
-        val localDataSettings = ProjectInterface.localDataSettings ?: return ""
-        return localDataSettings.getStringValue(Dav.avatarEtagKey, "")
-    }
-
-    private fun getJwtFromSettings() : String{
-        val localDataSettings = ProjectInterface.localDataSettings ?: return ""
-        return localDataSettings.getStringValue(Dav.jwtKey, "")
-    }
-
-    private fun setEmailInSettings(value: String){
-        ProjectInterface.localDataSettings?.setStringValue(Dav.emailKey, value)
-    }
-
-    private fun setUsernameInSettings(value: String){
-        ProjectInterface.localDataSettings?.setStringValue(Dav.usernameKey, value)
-    }
-
-    private fun setTotalStorageInSettings(value: Long){
-        ProjectInterface.localDataSettings?.setLongValue(Dav.totalStorageKey, value)
-    }
-
-    private fun setUsedStorageInSettings(value: Long){
-        ProjectInterface.localDataSettings?.setLongValue(Dav.usedStorageKey, value)
-    }
-
-    private fun setPlanInSettings(value: DavPlan){
-        ProjectInterface.localDataSettings?.setIntValue(Dav.planKey, value.plan)
-    }
-
-    private fun setAvatarEtagInSettings(value: String){
-        ProjectInterface.localDataSettings?.setStringValue(Dav.avatarEtagKey, value)
-    }
-
-    private fun setJwtInSettings(value: String){
-        ProjectInterface.localDataSettings?.setStringValue(Dav.jwtKey, value)
-    }
-
     companion object {
         private fun convertIntToDavPlan(plan: Int) : DavPlan{
             return when(plan){
                 1 -> DavPlan.Plus
                 else -> DavPlan.Free
             }
+        }
+
+        internal fun getEmailFromSettings() : String{
+            val localDataSettings = ProjectInterface.localDataSettings ?: return ""
+            return localDataSettings.getStringValue(Dav.emailKey, "")
+        }
+
+        internal fun getUsernameFromSettings() : String{
+            val localDataSettings = ProjectInterface.localDataSettings ?: return ""
+            return localDataSettings.getStringValue(Dav.usernameKey, "")
+        }
+
+        internal fun getTotalStorageFromSettings() : Long{
+            val localDataSettings = ProjectInterface.localDataSettings ?: return 0
+            return localDataSettings.getLongValue(Dav.totalStorageKey, 0)
+        }
+
+        internal fun getUsedStorageFromSettings() : Long{
+            val localDataSettings = ProjectInterface.localDataSettings ?: return 0
+            return localDataSettings.getLongValue(Dav.usedStorageKey, 0)
+        }
+
+        internal fun getPlanFromSettings() : DavPlan{
+            val localDataSettings = ProjectInterface.localDataSettings ?: return DavPlan.Free
+            return if(localDataSettings.getIntValue(Dav.planKey, 0) == 1) DavPlan.Plus else DavPlan.Free
+        }
+
+        internal fun getAvatarEtagFromSettings() : String{
+            val localDataSettings = ProjectInterface.localDataSettings ?: return ""
+            return localDataSettings.getStringValue(Dav.avatarEtagKey, "")
+        }
+
+        internal fun getJwtFromSettings() : String{
+            val localDataSettings = ProjectInterface.localDataSettings ?: return ""
+            return localDataSettings.getStringValue(Dav.jwtKey, "")
+        }
+
+        private fun setEmailInSettings(value: String){
+            ProjectInterface.localDataSettings?.setStringValue(Dav.emailKey, value)
+        }
+
+        private fun setUsernameInSettings(value: String){
+            ProjectInterface.localDataSettings?.setStringValue(Dav.usernameKey, value)
+        }
+
+        private fun setTotalStorageInSettings(value: Long){
+            ProjectInterface.localDataSettings?.setLongValue(Dav.totalStorageKey, value)
+        }
+
+        private fun setUsedStorageInSettings(value: Long){
+            ProjectInterface.localDataSettings?.setLongValue(Dav.usedStorageKey, value)
+        }
+
+        private fun setPlanInSettings(value: DavPlan){
+            ProjectInterface.localDataSettings?.setIntValue(Dav.planKey, value.plan)
+        }
+
+        private fun setAvatarEtagInSettings(value: String){
+            ProjectInterface.localDataSettings?.setStringValue(Dav.avatarEtagKey, value)
+        }
+
+        private fun setJwtInSettings(value: String){
+            ProjectInterface.localDataSettings?.setStringValue(Dav.jwtKey, value)
         }
     }
 }
