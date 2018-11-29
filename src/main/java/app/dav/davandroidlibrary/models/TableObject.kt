@@ -3,6 +3,7 @@ package app.dav.davandroidlibrary.models
 import android.arch.persistence.room.Entity
 import android.arch.persistence.room.PrimaryKey
 import app.dav.davandroidlibrary.Dav
+import app.dav.davandroidlibrary.data.DataManager
 import java.io.File
 import java.util.*
 import kotlin.collections.ArrayList
@@ -47,7 +48,7 @@ class TableObject{
         for (p in properties) this.properties.add(p)
     }
 
-    private suspend fun save(){
+    internal suspend fun save(){
         // Check if the table object already exists
         if(!Dav.Database.tableObjectExists(uuid).await()){
             id = Dav.Database.createTableObject(this).await()
@@ -56,7 +57,7 @@ class TableObject{
         }
     }
 
-    private suspend fun saveWithProperties(){
+    internal suspend fun saveWithProperties(){
         // Check if the table object already exists
         if(!Dav.Database.tableObjectExists(uuid).await()){
             id = Dav.Database.createTableObjectWithProperties(this).await()
@@ -71,27 +72,7 @@ class TableObject{
             }
         }
 
-        // TODO SyncPush()
-    }
-
-    suspend fun setFile(file: File){
-        saveFile(file)
-    }
-
-    private suspend fun saveFile(file: File){
-        if(uploadStatus == TableObjectUploadStatus.UpToDate) uploadStatus = TableObjectUploadStatus.Updated
-
-        // Save the file in the data folder with the uuid as name (without extension)
-        val filename: String = uuid.toString()
-        val tableFolder = Dav.Database.getTableFolder(tableId)
-        val newFile = File(tableFolder.path + "/" + filename)
-        this.file = file.copyTo(newFile, true)
-
-        if(!file.extension.isEmpty()){
-            setPropertyValue("ext", file.extension)
-        }
-
-        save()
+        DataManager.SyncPush()
     }
 
     suspend fun load(){
@@ -117,11 +98,6 @@ class TableObject{
         }
     }
 
-    fun getPropertyValue(name: String) : String?{
-        val property = properties.find { it.name == name }
-        return if(property != null) property.value else null
-    }
-
     suspend fun setPropertyValue(name: String, value: String){
         val property = properties.find { it.name == name }
 
@@ -139,20 +115,18 @@ class TableObject{
             uploadStatus = TableObjectUploadStatus.Updated
 
         save()
-        // TODO SyncPush()
+        DataManager.SyncPush()
     }
 
-    suspend fun changeUploadStatus(uploadStatus: TableObjectUploadStatus){
-        if(uploadStatus == this.uploadStatus) return
-
-        this.uploadStatus = uploadStatus
-        save()
+    fun getPropertyValue(name: String) : String?{
+        val property = properties.find { it.name == name }
+        return if(property != null) property.value else null
     }
 
     suspend fun delete(){
-        val jwt = null    // TODO DavUser.getJWT()
+        val jwt = DavUser.getJwtFromSettings()
 
-        if(jwt == null){
+        if(jwt.isEmpty()){
             deleteImmediately()
             uploadStatus = TableObjectUploadStatus.Deleted
         }else{
@@ -163,8 +137,8 @@ class TableObject{
                 }
             }
 
-            changeUploadStatus(TableObjectUploadStatus.Deleted)
-            // TODO SyncPush()
+            saveUploadStatus(TableObjectUploadStatus.Deleted)
+            DataManager.SyncPush()
         }
     }
 
@@ -174,6 +148,43 @@ class TableObject{
         }
 
         Dav.Database.deleteTableObjectImmediately(uuid)
+    }
+
+    internal suspend fun saveVisibility(visibility: TableObjectVisibility){
+        if(this.visibility == visibility) return
+        this.visibility = visibility
+        save()
+    }
+
+    suspend fun saveUploadStatus(uploadStatus: TableObjectUploadStatus){
+        if(uploadStatus == this.uploadStatus) return
+
+        this.uploadStatus = uploadStatus
+        save()
+    }
+
+    suspend fun setFile(file: File){
+        saveFile(file)
+    }
+
+    private suspend fun saveFile(file: File){
+        if(uploadStatus == TableObjectUploadStatus.UpToDate) uploadStatus = TableObjectUploadStatus.Updated
+
+        // Save the file in the data folder with the uuid as name (without extension)
+        val filename: String = uuid.toString()
+        val tableFolder = Dav.Database.getTableFolder(tableId)
+        val newFile = File(tableFolder.path + "/" + filename)
+        this.file = file.copyTo(newFile, true)
+
+        if(!file.extension.isEmpty()){
+            setPropertyValue("ext", file.extension)
+        }
+
+        save()
+    }
+
+    fun fileDownloaded() : Boolean{
+        return file?.exists() ?: false
     }
 
     companion object {
