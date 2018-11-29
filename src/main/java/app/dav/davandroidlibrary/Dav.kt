@@ -3,7 +3,10 @@ package app.dav.davandroidlibrary
 import android.content.Context
 import app.dav.davandroidlibrary.common.ProjectInterface
 import app.dav.davandroidlibrary.data.DavDatabase
-import app.dav.davandroidlibrary.models.*
+import app.dav.davandroidlibrary.models.Property
+import app.dav.davandroidlibrary.models.PropertyEntity
+import app.dav.davandroidlibrary.models.TableObject
+import app.dav.davandroidlibrary.models.TableObjectUploadStatus
 import kotlinx.coroutines.experimental.Deferred
 import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.async
@@ -14,7 +17,7 @@ import kotlin.collections.ArrayList
 
 object Dav {
     private const val apiBaseUrlProduction = "https://dav-backend.herokuapp.com/v1/"
-    private const val apiBaseUrlDevelopment = "https://e745809a.ngrok.io/v1/"
+    private const val apiBaseUrlDevelopment = "https://26796d96.ngrok.io/v1/"
     val apiBaseUrl = if(environment == DavEnvironment.Production) apiBaseUrlProduction else apiBaseUrlDevelopment
     const val databaseName = "dav.db"
     var database: DavDatabase? = null
@@ -49,7 +52,7 @@ object Dav {
 
         fun createTableObjectWithProperties(tableObject: TableObject) : Deferred<Long>{
             return GlobalScope.async {
-                val tableObjectEntity = TableObjectEntity(tableObject.tableId, tableObject.uuid.toString(), 0, 0, tableObject.isFile, tableObject.etag)
+                val tableObjectEntity = TableObject.convertTableObjectToTableObjectEntity(tableObject)
                 val id = database?.tableObjectDao()?.insertTableObject(tableObjectEntity) ?: 0
                 if(!id.equals(0)){
                     for(property in tableObject.properties){
@@ -69,6 +72,25 @@ object Dav {
                     tableObject.load()
                     tableObject
                 }else null
+            }
+        }
+
+        fun getAllTableObjects(deleted: Boolean) : Deferred<ArrayList<TableObject>>{
+            return GlobalScope.async {
+                val db = database
+                val tableObjectEntities = if(db != null) db.tableObjectDao().getTableObjects() else listOf()
+                val tableObjects = ArrayList<TableObject>()
+
+                for(obj in tableObjectEntities){
+                    val tableObject = TableObject.convertTableObjectEntityToTableObject(obj)
+
+                    if(!deleted && tableObject.uploadStatus == TableObjectUploadStatus.Deleted) continue
+
+                    tableObject.load()
+                    tableObjects.add(tableObject)
+                }
+
+                tableObjects
             }
         }
 
@@ -108,7 +130,7 @@ object Dav {
             if(tableObject.uploadStatus == TableObjectUploadStatus.Deleted){
                 deleteTableObjectImmediately(uuid)
             }else{
-                tableObject.changeUploadStatus(TableObjectUploadStatus.Deleted)
+                tableObject.saveUploadStatus(TableObjectUploadStatus.Deleted)
             }
         }
 
