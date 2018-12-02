@@ -4,19 +4,17 @@ import android.util.Log
 import app.dav.davandroidlibrary.Dav
 import app.dav.davandroidlibrary.common.ProjectInterface
 import app.dav.davandroidlibrary.data.DataManager
-import com.beust.klaxon.Klaxon
-import kotlinx.coroutines.experimental.GlobalScope
-import kotlinx.coroutines.experimental.async
-import kotlinx.coroutines.experimental.launch
+import kotlinx.coroutines.experimental.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONObject
 import java.io.File
 import java.io.InputStream
 
 private const val avatarFileName = "avatar.png"
 private val avatarFilePath = Dav.dataPath + avatarFileName
 
-class DavUser{
+class DavUser() {
     var email: String
         get() = getEmailFromSettings()
         set(value) = setEmailInSettings(value)
@@ -41,15 +39,14 @@ class DavUser{
         get() = getJwtFromSettings()
         set(value) = setJwtInSettings(value)
 
-    constructor(){
-        // Get the user information from the local settings
+    init {
         if(!jwt.isEmpty()){
             // User is logged in. Get the user information
             isLoggedIn = true
 
-            GlobalScope.launch {
+            GlobalScope.launch(Dispatchers.IO) {
                 downloadUserInformation()
-                // TODO Sync
+                DataManager.Sync().await()
             }
         }else{
             isLoggedIn = false
@@ -60,7 +57,7 @@ class DavUser{
         this.jwt = jwt
         isLoggedIn = true
         if(downloadUserInformation())
-            // TODO Sync
+            GlobalScope.launch(Dispatchers.IO) { DataManager.Sync().await() }
         else
             logout()
     }
@@ -88,17 +85,17 @@ class DavUser{
 
     private suspend fun downloadUserInformation() : Boolean{
         if(!isLoggedIn) return false
-        val getResult = DataManager.httpGet(jwt, Dav.getUserUrl)
+        val getResult = DataManager.httpGet(jwt, Dav.getUserUrl).await()
 
         if(getResult.key){
-            val json = Klaxon().parse<DavUserData>(getResult.value) ?: return false
-            email = json.email
-            username = json.username
-            totalStorage = json.total_storage
-            usedStorage = json.used_storage
-            plan = convertIntToDavPlan(json.plan)
-            val newAvatarEtag = json.avatar_etag
-            val avatarUrl = json.avatar
+            val userData = DavUserData(getResult.value)
+            email = userData.email
+            username = userData.username
+            totalStorage = userData.total_storage
+            usedStorage = userData.used_storage
+            plan = convertIntToDavPlan(userData.plan)
+            val newAvatarEtag = userData.avatar_etag
+            val avatarUrl = userData.avatar
 
             val avatarFile = File(avatarFilePath)
 
@@ -189,31 +186,31 @@ class DavUser{
             return localDataSettings.getStringValue(Dav.jwtKey, "")
         }
 
-        private fun setEmailInSettings(value: String){
+        internal fun setEmailInSettings(value: String){
             ProjectInterface.localDataSettings?.setStringValue(Dav.emailKey, value)
         }
 
-        private fun setUsernameInSettings(value: String){
+        internal fun setUsernameInSettings(value: String){
             ProjectInterface.localDataSettings?.setStringValue(Dav.usernameKey, value)
         }
 
-        private fun setTotalStorageInSettings(value: Long){
+        internal fun setTotalStorageInSettings(value: Long){
             ProjectInterface.localDataSettings?.setLongValue(Dav.totalStorageKey, value)
         }
 
-        private fun setUsedStorageInSettings(value: Long){
+        internal fun setUsedStorageInSettings(value: Long){
             ProjectInterface.localDataSettings?.setLongValue(Dav.usedStorageKey, value)
         }
 
-        private fun setPlanInSettings(value: DavPlan){
+        internal fun setPlanInSettings(value: DavPlan){
             ProjectInterface.localDataSettings?.setIntValue(Dav.planKey, value.plan)
         }
 
-        private fun setAvatarEtagInSettings(value: String){
+        internal fun setAvatarEtagInSettings(value: String){
             ProjectInterface.localDataSettings?.setStringValue(Dav.avatarEtagKey, value)
         }
 
-        private fun setJwtInSettings(value: String){
+        internal fun setJwtInSettings(value: String){
             ProjectInterface.localDataSettings?.setStringValue(Dav.jwtKey, value)
         }
     }
@@ -224,10 +221,12 @@ enum class DavPlan(val plan: Int){
     Plus(1)
 }
 
-data class DavUserData(val email: String,
-                       val username: String,
-                       val total_storage: Long,
-                       val used_storage: Long,
-                       val plan: Int,
-                       val avatar: String,
-                       val avatar_etag: String)
+internal class DavUserData(json: String) : JSONObject(json){
+    val email: String = this.optString("email")
+    val username: String = this.optString("username")
+    val total_storage: Long = this.optLong("total_storage")
+    val used_storage: Long = this.optLong("used_storage")
+    val plan: Int = this.optInt("plan")
+    val avatar: String = this.optString("avatar")
+    val avatar_etag: String = this.optString("avatar_etag")
+}
