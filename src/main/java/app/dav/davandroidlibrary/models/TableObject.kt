@@ -2,11 +2,24 @@ package app.dav.davandroidlibrary.models
 
 import android.arch.persistence.room.Entity
 import android.arch.persistence.room.PrimaryKey
+import android.util.Log
+import android.webkit.MimeTypeMap
 import app.dav.davandroidlibrary.Dav
+import app.dav.davandroidlibrary.common.ProjectInterface
 import app.dav.davandroidlibrary.data.DataManager
+import app.dav.davandroidlibrary.data.extPropertyName
+import com.beust.klaxon.Klaxon
+import kotlinx.coroutines.experimental.*
+import okhttp3.MediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody
+import org.json.JSONObject
 import java.io.File
+import java.io.IOException
 import java.util.*
 import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 
 @Entity(tableName = "TableObject")
 data class TableObjectEntity(
@@ -72,7 +85,9 @@ class TableObject{
             }
         }
 
-        DataManager.SyncPush()
+        GlobalScope.launch(Dispatchers.IO) {
+            DataManager.SyncPush().await()
+        }
     }
 
     suspend fun load(){
@@ -115,7 +130,7 @@ class TableObject{
             uploadStatus = TableObjectUploadStatus.Updated
 
         save()
-        DataManager.SyncPush()
+        GlobalScope.launch(Dispatchers.IO) { DataManager.SyncPush().await() }
     }
 
     fun getPropertyValue(name: String) : String?{
@@ -138,7 +153,7 @@ class TableObject{
             }
 
             saveUploadStatus(TableObjectUploadStatus.Deleted)
-            DataManager.SyncPush()
+            GlobalScope.launch(Dispatchers.IO) { DataManager.SyncPush().await() }
         }
     }
 
@@ -185,6 +200,160 @@ class TableObject{
 
     fun fileDownloaded() : Boolean{
         return file?.exists() ?: false
+    }
+
+    internal suspend fun createOnServer() : String?{
+        if(ProjectInterface.generalMethods?.isNetworkAvailable() != true) return null
+        val appId = ProjectInterface.retrieveConstants?.getAppId() ?: return null
+
+        val jwt = DavUser.getJwtFromSettings()
+        if(jwt.isEmpty()) return null
+
+        var url = "apps/object?uuid=$uuid&app_id=$appId&table_id=$tableId"
+        val client = OkHttpClient()
+        val requestBuilder = Request.Builder()
+                .header("Authorization", jwt)
+
+        if(isFile){
+            val f = file ?: return null
+
+            // Set the Content-Type header
+            val ext = getPropertyValue("ext") ?: return null
+            val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: return null
+            url += "&ext=$ext"
+
+            // Add the file to the request
+            val requestBody = RequestBody.create(MediaType.parse(mimeType), f)
+            requestBuilder.post(requestBody)
+        }else{
+            // Set the properties
+            val propertiesMap = HashMap<String, String>()
+            for(property in properties){
+                propertiesMap.put(property.name, property.value)
+            }
+            val json = Klaxon().toJsonString(propertiesMap)
+            val requestBody = RequestBody.create(MediaType.parse("application/json"), json)
+            requestBuilder.post(requestBody)
+        }
+
+        try{
+            return GlobalScope.async {
+                val response = client.newCall(requestBuilder
+                        .url(Dav.apiBaseUrl + url)
+                        .build())
+                        .execute()
+                val responseBody = response.body()?.string() ?: return@async null
+
+                if(response.isSuccessful){
+                    // Convert the result string to TableObjectData
+                    val tableObjectData = TableObjectData(responseBody)
+                    tableObjectData.etag
+                }else{
+                    // Check the error
+                    if(responseBody.contains("2704")){    // Field already taken: uuid
+                        saveUploadStatus(TableObjectUploadStatus.UpToDate)
+                    }
+
+                    null
+                }
+            }.await()
+        }catch (e: IOException){
+            Log.d("TableObject", "Error in createOnServer: ${e.message}")
+            return null
+        }
+    }
+
+    internal suspend fun updateOnServer() : String?{
+        if(ProjectInterface.generalMethods?.isNetworkAvailable() != true) return null
+
+        val jwt = DavUser.getJwtFromSettings()
+        if(jwt.isEmpty()) return null
+
+        var url = "apps/object/$uuid"
+        val client = OkHttpClient()
+        val requestBuilder = Request.Builder()
+                .header("Authorization", jwt)
+
+        if(isFile){
+            val f = file ?: return null
+
+            // Set the Content-Type header
+            val ext = getPropertyValue(extPropertyName) ?: return null
+            val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: return null
+            url += "&ext=$ext"
+
+            // Add the file to the request
+            val requestBody = RequestBody.create(MediaType.parse(mimeType), f)
+            requestBuilder.put(requestBody)
+        }else{
+            // Set the properties
+            val propertiesMap = HashMap<String, String>()
+            for(property in properties){
+                propertiesMap.put(property.name, property.value)
+            }
+            val json = Klaxon().toJsonString(propertiesMap)
+            val requestBody = RequestBody.create(MediaType.parse("application/json"), json)
+            requestBuilder.put(requestBody)
+        }
+
+        try{
+            return GlobalScope.async {
+                val response = client.newCall(requestBuilder
+                        .url(Dav.apiBaseUrl + url)
+                        .build())
+                        .execute()
+                val responseBody = response.body()?.string() ?: return@async null
+
+                if(response.isSuccessful){
+                    // Convert the result string to TableObjectData
+                    val tableObjectData = TableObjectData(responseBody)
+                    tableObjectData.etag
+                }else{
+                    // Check the error
+                    if(responseBody.contains("2805")){  // Resource does not exist: TableObject
+                        // Delete the table object locally
+                        deleteImmediately()
+                    }
+
+                    null
+                }
+            }.await()
+        }catch (e: IOException){
+            Log.d("TableObject", "Error in updateOnServer: ${e.message}")
+            return null
+        }
+    }
+
+    internal suspend fun deleteOnServer() : Boolean{
+        if(ProjectInterface.generalMethods?.isNetworkAvailable() != true) return false
+
+        val jwt = DavUser.getJwtFromSettings()
+        if(jwt.isEmpty()) return false
+
+        val url = "apps/object/$uuid"
+        val client = OkHttpClient()
+        val request = Request.Builder()
+                .url(Dav.apiBaseUrl + url)
+                .header("Authorization", jwt)
+                .delete()
+                .build()
+
+        try {
+            return GlobalScope.async {
+                val response = client.newCall(request).execute()
+
+                if(response.isSuccessful){
+                    true
+                }else{
+                    // Check the error
+                    val responseBody = response.body()?.string() ?: return@async false
+                    return@async responseBody.contains("2805") || responseBody.contains("1102")
+                }
+            }.await()
+        }catch (e: IOException){
+            Log.d("TableObject", "Error in deleteOnServer: ${e.message}")
+            return false
+        }
     }
 
     companion object {
@@ -257,20 +426,22 @@ class TableObject{
 
         internal fun convertTableObjectDataToTableObject(tableObjectData: TableObjectData) : TableObject{
             val tableObject = TableObject()
-            tableObject.id = tableObjectData.id
-            tableObject.tableId = tableObjectData.table_id
-            tableObject.visibility = convertIntToVisibility(tableObjectData.visibility)
+            tableObject.id = tableObjectData.id ?: 0
+            tableObject.tableId = tableObjectData.table_id ?: 0
+            tableObject.visibility = convertIntToVisibility(tableObjectData.visibility ?: 0)
             tableObject.uuid = tableObjectData.uuid
-            tableObject.isFile = tableObjectData.file
-            tableObject.etag = tableObjectData.etag
+            tableObject.isFile = tableObjectData.file ?: false
+            tableObject.etag = tableObjectData.etag ?: ""
 
             val properties = ArrayList<Property>()
 
-            for(key in tableObjectData.properties.keys()){
-                val property = Property()
-                property.name = key
-                property.value = tableObjectData.properties.get(key)
-                properties.add(property)
+            if(tableObjectData.properties != null){
+                for(key in tableObjectData.properties.keys){
+                    val property = Property()
+                    property.name = key
+                    property.value = tableObjectData.properties[key] ?: ""
+                    properties.add(property)
+                }
             }
 
             tableObject.properties = properties
@@ -293,12 +464,19 @@ enum class TableObjectUploadStatus(val uploadStatus: Int){
     NoUpload(4)
 }
 
-internal data class TableObjectData(
-        var id: Long,
-        val table_id: Int,
-        val visibility: Int,
-        val uuid: UUID,
-        val file: Boolean,
-        val properties: Dictionary<String, String>,
-        val etag: String
-)
+internal class TableObjectData(json: String) : JSONObject(json){
+    var id: Long? = this.optLong("id")
+    val table_id: Int? = this.optInt("table_id")
+    val visibility: Int? = this.optInt("visibility")
+    val uuid: UUID = UUID.fromString(this.optString("uuid"))
+    val file: Boolean? = this.optBoolean("file")
+    val properties: HashMap<String, String>? = this.optJSONObject("properties")
+            ?.let {
+                val map = HashMap<String, String>()
+                for(key in it.keys()){
+                    map.put(key, it.getString(key))
+                }
+                map
+            }
+    val etag: String? = this.optString("etag")
+}
