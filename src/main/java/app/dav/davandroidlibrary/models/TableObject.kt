@@ -10,6 +10,8 @@ import app.dav.davandroidlibrary.data.DataManager
 import app.dav.davandroidlibrary.data.extPropertyName
 import com.beust.klaxon.Klaxon
 import kotlinx.coroutines.experimental.*
+import kotlinx.coroutines.experimental.android.Main
+import kotlinx.coroutines.experimental.channels.Channel
 import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -17,6 +19,7 @@ import okhttp3.RequestBody
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
@@ -43,8 +46,23 @@ class TableObject{
     var file: File? = null
     var etag: String = ""
     var properties = ArrayList<Property>()
+    val downloadStatus: TableObjectDownloadStatus
+        get() = findDownloadStatus()
 
     constructor()
+
+    private fun findDownloadStatus() : TableObjectDownloadStatus{
+        if(!isFile) return TableObjectDownloadStatus.NoFileOrNotLoggedIn
+
+        if(file?.exists() == true)
+            return TableObjectDownloadStatus.Downloaded
+
+        val jwt = DavUser.getJwtFromSettings()
+        if(jwt.isEmpty()) return TableObjectDownloadStatus.NoFileOrNotLoggedIn
+
+        if(DataManager.fileDownloadProgress.containsKey(uuid)) return TableObjectDownloadStatus.Downloading
+        return TableObjectDownloadStatus.NotDownloaded
+    }
 
     constructor(tableId: Int){
         this.tableId = tableId
@@ -86,7 +104,7 @@ class TableObject{
         }
 
         GlobalScope.launch(Dispatchers.IO) {
-            DataManager.SyncPush().await()
+            DataManager.syncPush().await()
         }
     }
 
@@ -130,7 +148,7 @@ class TableObject{
             uploadStatus = TableObjectUploadStatus.Updated
 
         save()
-        GlobalScope.launch(Dispatchers.IO) { DataManager.SyncPush().await() }
+        GlobalScope.launch(Dispatchers.IO) { DataManager.syncPush().await() }
     }
 
     fun getPropertyValue(name: String) : String?{
@@ -153,7 +171,7 @@ class TableObject{
             }
 
             saveUploadStatus(TableObjectUploadStatus.Deleted)
-            GlobalScope.launch(Dispatchers.IO) { DataManager.SyncPush().await() }
+            GlobalScope.launch(Dispatchers.IO) { DataManager.syncPush().await() }
         }
     }
 
@@ -200,6 +218,70 @@ class TableObject{
 
     fun fileDownloaded() : Boolean{
         return file?.exists() ?: false
+    }
+
+    fun getDownloadFileProgress() : Channel<Int>?{
+        if(downloadStatus != TableObjectDownloadStatus.Downloading) return null
+        return DataManager.fileDownloadProgress[uuid] as Channel<Int>
+    }
+
+    fun downloadFile() : Deferred<Unit>{
+        return GlobalScope.async {
+            val jwt = DavUser.getJwtFromSettings()
+            if (downloadStatus != TableObjectDownloadStatus.NotDownloaded || jwt.isEmpty()) return@async
+
+            // Add the download progress to the list in DataManager
+            DataManager.fileDownloadProgress.put(uuid, Channel<Int>())
+
+            // Start the download
+            val url = "${Dav.apiBaseUrl}apps/object/$uuid?file=true"
+
+            // Remove the table object from the queue
+            DataManager.fileDownloadQueue.remove(this@TableObject)
+
+            try {
+                val client = OkHttpClient()
+                val request = Request.Builder()
+                        .url(url)
+                        .header("Authorization", jwt)
+                        .build()
+
+                val response = client.newCall(request).execute()
+                if(response.isSuccessful){
+                    val byteStream: InputStream = response.body()?.byteStream() ?: return@async
+                    val tempFile = File.createTempFile(uuid.toString(), null)
+                    tempFile.copyInputStreamToFile(byteStream) {
+                        // Report the progress to the SendChannel and update the progress in the DataManager list
+                        GlobalScope.launch(Dispatchers.Main) {
+                            DataManager.fileDownloadProgress[uuid]?.send(it)
+                        }
+                    }
+
+                    // Copy the temp file into the appropriate table folder
+                    val file = File(DataManager.getTableFolder(tableId), uuid.toString())
+                    tempFile.copyTo(file, true)
+
+                    DataManager.fileDownloadProgress.remove(uuid)
+                }else{
+                    // Check the error
+                    Log.d("TableObject", "Error: ${response.body()?.string()}")
+                    // TODO
+                }
+            } catch (e: Exception) {
+                Log.d("TableObject", "There was an error when downloading the file: ${e.message}")
+            }
+        }
+    }
+
+    private fun File.copyInputStreamToFile(inputStream: InputStream, reportProgress: (progress: Int) -> Unit) {
+        // Return the progress as int between 0 and 100
+        reportProgress(1)
+
+        inputStream.use { input ->
+            this.outputStream().use { fileOut ->
+                input.copyTo(fileOut)
+            }
+        }
     }
 
     internal suspend fun createOnServer() : String?{
@@ -462,6 +544,13 @@ enum class TableObjectUploadStatus(val uploadStatus: Int){
     Updated(2),
     Deleted(3),
     NoUpload(4)
+}
+
+enum class TableObjectDownloadStatus(val downloadStatus: Int){
+    NoFileOrNotLoggedIn(0),
+    NotDownloaded(1),
+    Downloading(2),
+    Downloaded(3)
 }
 
 internal class TableObjectData(json: String) : JSONObject(json){
