@@ -46,7 +46,7 @@ class DavUser() {
 
             GlobalScope.launch(Dispatchers.IO) {
                 downloadUserInformation()
-                DataManager.Sync().await()
+                DataManager.sync().await()
             }
         }else{
             isLoggedIn = false
@@ -57,7 +57,7 @@ class DavUser() {
         this.jwt = jwt
         isLoggedIn = true
         if(downloadUserInformation())
-            GlobalScope.launch(Dispatchers.IO) { DataManager.Sync().await() }
+            GlobalScope.launch(Dispatchers.IO) { DataManager.sync().await() }
         else
             logout()
     }

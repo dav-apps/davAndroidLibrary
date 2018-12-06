@@ -1,6 +1,7 @@
 package app.dav.davandroidlibrary.data
 
-import android.util.Log
+import android.os.Handler
+import android.os.Looper
 import app.dav.davandroidlibrary.Dav
 import app.dav.davandroidlibrary.HttpResultEntry
 import app.dav.davandroidlibrary.common.ProjectInterface
@@ -8,13 +9,15 @@ import app.dav.davandroidlibrary.models.*
 import kotlinx.coroutines.experimental.Deferred
 import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.async
+import kotlinx.coroutines.experimental.channels.SendChannel
+import kotlinx.coroutines.experimental.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.File
 import java.io.IOException
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
-import kotlin.concurrent.schedule
 
 internal const val extPropertyName = "ext"
 private const val downloadFilesSimultaneously = 2
@@ -23,8 +26,12 @@ class DataManager{
     companion object {
         private var isSyncing = false
         private var syncAgain = false
-        private val fileDownloads = ArrayList<TableObject>()
-        private val fileDownloaders = HashMap<UUID, OkHttpClient>()
+        // The list with the files that will be downloaded asap
+        internal val fileDownloadQueue = ArrayList<TableObject>()
+        // Contains the currently downloading files and the progress
+        internal val fileDownloadProgress = HashMap<UUID, SendChannel<Int>>()
+        private val downloadHandler = Handler(Looper.getMainLooper())
+        private val downloadRunnable = Runnable { GlobalScope.launch { downloadFilesTimerElapsed() } }
 
         fun httpGet(jwt: String, url: String) : Deferred<HttpResultEntry> {
             return GlobalScope.async {
@@ -52,15 +59,21 @@ class DataManager{
             }
         }
 
-        internal suspend fun Sync() : Deferred<Unit>{
+        internal fun getTableFolder(tableId: Int) : File{
+            val folder = File("${Dav.dataPath}$tableId")
+            folder.mkdir()
+            return folder
+        }
+
+        internal suspend fun sync() : Deferred<Unit>{
             return GlobalScope.async {
                 if(isSyncing) return@async
 
                 isSyncing = true
                 val jwt = DavUser.getJwtFromSettings()
                 if(jwt.isEmpty()) return@async
-                fileDownloads.clear()
-                fileDownloaders.clear()
+                fileDownloadQueue.clear()
+                fileDownloadProgress.clear()
 
                 // Get the specified tables
                 val tableIds = ProjectInterface.retrieveConstants?.getTableIds() ?: return@async
@@ -101,12 +114,13 @@ class DataManager{
                                         // Was the file downloaded?
                                         if(!currentTableObject.fileDownloaded()){
                                             // Download the file
-                                            fileDownloads.add(currentTableObject)
+                                            fileDownloadQueue.add(currentTableObject)
                                         }
                                     }
                                 }else{
                                     // GET the table object
                                     val tableObject = downloadTableObject(currentTableObject.uuid) ?: continue
+                                    tableObject.uploadStatus = TableObjectUploadStatus.UpToDate
 
                                     // Is it a file?
                                     if(tableObject.isFile){
@@ -122,10 +136,9 @@ class DataManager{
                                         tableObject.saveWithProperties()
 
                                         // Download the file
-                                        fileDownloads.add(tableObject)
+                                        fileDownloadQueue.add(tableObject)
                                     }else{
                                         // Save the table object
-                                        tableObject.uploadStatus = TableObjectUploadStatus.UpToDate
                                         tableObject.saveWithProperties()
                                         ProjectInterface.triggerAction?.updateTableObject(tableObject, false)
                                         tableChanged = true
@@ -134,10 +147,9 @@ class DataManager{
                             }else{
                                 // GET the table object
                                 val tableObject = downloadTableObject(obj.uuid) ?: continue
+                                tableObject.uploadStatus = TableObjectUploadStatus.UpToDate
 
                                 if(tableObject.isFile){
-                                    val etag = tableObject.etag
-
                                     // Remove all properties except ext
                                     val removingProperties = ArrayList<Property>()
                                     for(p in tableObject.properties)
@@ -146,20 +158,15 @@ class DataManager{
                                     for(p in removingProperties)
                                         tableObject.properties.remove(p)
 
-                                    // Save the table object without properties and etag (the etag will be saved later when the file was downloaded)
-                                    tableObject.etag = ""
                                     tableObject.saveWithProperties()
-                                    tableObject.saveUploadStatus(TableObjectUploadStatus.UpToDate)
 
                                     // Download the file
-                                    tableObject.etag = etag
-                                    fileDownloads.add(tableObject)
+                                    fileDownloadQueue.add(tableObject)
 
                                     ProjectInterface.triggerAction?.updateTableObject(tableObject, false)
                                     tableChanged = true
                                 }else{
                                     // Save the table object
-                                    tableObject.uploadStatus = TableObjectUploadStatus.UpToDate
                                     tableObject.saveWithProperties()
                                     ProjectInterface.triggerAction?.updateTableObject(tableObject, false)
                                     tableChanged = true
@@ -195,12 +202,12 @@ class DataManager{
                 isSyncing = false
 
                 // Push changes
-                SyncPush().await()
+                syncPush().await()
                 downloadFiles()
             }
         }
 
-        internal suspend fun SyncPush() : Deferred<Unit> {
+        internal suspend fun syncPush() : Deferred<Unit> {
             return GlobalScope.async {
                 if(isSyncing){
                     syncAgain = true
@@ -254,7 +261,7 @@ class DataManager{
 
                 if(syncAgain){
                     syncAgain = false
-                    SyncPush().await()
+                    syncPush().await()
                 }
             }
         }
@@ -280,14 +287,24 @@ class DataManager{
         }
 
         private fun downloadFiles(){
-            // Do not download more than downloadFilesSimultaneously files at the same time
-            val timer = Timer("fileDownloads", false).schedule(5000) {
-                downloadFilesTimerElapsed()
-            }
+            // Trigger the runnable
+            downloadHandler.postDelayed(downloadRunnable, 5000)
         }
 
-        private fun downloadFilesTimerElapsed(){
-            Log.d("DataManager", "downloadFileTimerElapsed")
+        private suspend fun downloadFilesTimerElapsed(){
+            // Check the network connection
+            if(ProjectInterface.generalMethods?.isNetworkAvailable() != true) return
+
+            // TODO Check if there is enough free storage
+
+            // Check if there are files to download
+            if(fileDownloadProgress.count() < downloadFilesSimultaneously && fileDownloadQueue.count() > 0 &&
+                    fileDownloadQueue.first().downloadStatus == TableObjectDownloadStatus.NotDownloaded){
+                fileDownloadQueue.first().downloadFile().await()
+            }
+
+            if(fileDownloadQueue.count() > 0)
+                downloadHandler.postDelayed(downloadRunnable, 5000)
         }
     }
 }
