@@ -51,19 +51,6 @@ class TableObject{
 
     constructor()
 
-    private fun findDownloadStatus() : TableObjectDownloadStatus{
-        if(!isFile) return TableObjectDownloadStatus.NoFileOrNotLoggedIn
-
-        if(file?.exists() == true)
-            return TableObjectDownloadStatus.Downloaded
-
-        val jwt = DavUser.getJwtFromSettings()
-        if(jwt.isEmpty()) return TableObjectDownloadStatus.NoFileOrNotLoggedIn
-
-        if(DataManager.fileDownloadProgress.containsKey(uuid)) return TableObjectDownloadStatus.Downloading
-        return TableObjectDownloadStatus.NotDownloaded
-    }
-
     constructor(tableId: Int){
         this.tableId = tableId
     }
@@ -189,6 +176,19 @@ class TableObject{
         save()
     }
 
+    private fun findDownloadStatus() : TableObjectDownloadStatus{
+        if(!isFile) return TableObjectDownloadStatus.NoFileOrNotLoggedIn
+
+        if(file?.exists() == true)
+            return TableObjectDownloadStatus.Downloaded
+
+        val jwt = DavUser.getJwtFromSettings()
+        if(jwt.isEmpty()) return TableObjectDownloadStatus.NoFileOrNotLoggedIn
+
+        if(DataManager.fileDownloadProgress.containsKey(uuid)) return TableObjectDownloadStatus.Downloading
+        return TableObjectDownloadStatus.NotDownloaded
+    }
+
     suspend fun saveUploadStatus(uploadStatus: TableObjectUploadStatus){
         if(uploadStatus == this.uploadStatus) return
 
@@ -250,10 +250,14 @@ class TableObject{
                 if(response.isSuccessful){
                     val byteStream: InputStream = response.body()?.byteStream() ?: return@async
                     val tempFile = File.createTempFile(uuid.toString(), null)
+
                     tempFile.copyInputStreamToFile(byteStream) {
                         // Report the progress to the SendChannel and update the progress in the DataManager list
                         GlobalScope.launch(Dispatchers.Main) {
                             DataManager.fileDownloadProgress[uuid]?.send(it)
+                            if(it >= 100){
+                                DataManager.fileDownloadProgress[uuid]?.close()
+                            }
                         }
                     }
 
@@ -262,6 +266,7 @@ class TableObject{
                     tempFile.copyTo(file, true)
 
                     DataManager.fileDownloadProgress.remove(uuid)
+                    this@TableObject.file = file
                 }else{
                     // Check the error
                     Log.d("TableObject", "Error: ${response.body()?.string()}")
@@ -275,13 +280,13 @@ class TableObject{
 
     private fun File.copyInputStreamToFile(inputStream: InputStream, reportProgress: (progress: Int) -> Unit) {
         // Return the progress as int between 0 and 100
-        reportProgress(1)
-
         inputStream.use { input ->
             this.outputStream().use { fileOut ->
                 input.copyTo(fileOut)
             }
         }
+
+        reportProgress(100)
     }
 
     internal suspend fun createOnServer() : String?{
