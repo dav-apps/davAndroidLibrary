@@ -287,6 +287,10 @@ class DataManager{
         }
 
         private fun downloadFiles(){
+            // Check if there is enough storage space
+            val freeSpace = File(Dav.dataPath).freeSpace
+            if(freeSpace < 2000000000) return
+
             // Trigger the runnable
             downloadHandler.postDelayed(downloadRunnable, 5000)
         }
@@ -294,9 +298,7 @@ class DataManager{
         private suspend fun downloadFilesTimerElapsed(){
             // Check the network connection
             if(ProjectInterface.generalMethods?.isNetworkAvailable() != true) return
-
-            // TODO Check if there is enough free storage
-
+            
             // Check if there are files to download
             if(fileDownloadProgress.count() < downloadFilesSimultaneously && fileDownloadQueue.count() > 0 &&
                     fileDownloadQueue.first().downloadStatus == TableObjectDownloadStatus.NotDownloaded){
