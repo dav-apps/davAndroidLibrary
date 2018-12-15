@@ -7,10 +7,10 @@ import app.dav.davandroidlibrary.Dav
 import app.dav.davandroidlibrary.HttpResultEntry
 import app.dav.davandroidlibrary.common.ProjectInterface
 import app.dav.davandroidlibrary.models.*
-import kotlinx.coroutines.experimental.Deferred
-import kotlinx.coroutines.experimental.GlobalScope
-import kotlinx.coroutines.experimental.async
-import kotlinx.coroutines.experimental.launch
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File

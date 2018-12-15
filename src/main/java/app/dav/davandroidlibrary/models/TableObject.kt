@@ -11,8 +11,7 @@ import app.dav.davandroidlibrary.common.ProjectInterface
 import app.dav.davandroidlibrary.data.DataManager
 import app.dav.davandroidlibrary.data.extPropertyName
 import com.beust.klaxon.Klaxon
-import kotlinx.coroutines.experimental.*
-import kotlinx.coroutines.experimental.android.Main
+import kotlinx.coroutines.*
 import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -22,7 +21,6 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.util.*
-import java.util.concurrent.TimeUnit
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
 
@@ -249,7 +247,7 @@ class TableObject{
 
                     // Delay the thread until the download is finished
                     while (i in 0..99){
-                        delay(500, TimeUnit.MILLISECONDS)
+                        delay(500)
                     }
 
                     // Try to get the file

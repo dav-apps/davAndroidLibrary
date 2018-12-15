@@ -7,9 +7,9 @@ import app.dav.davandroidlibrary.models.Property
 import app.dav.davandroidlibrary.models.PropertyEntity
 import app.dav.davandroidlibrary.models.TableObject
 import app.dav.davandroidlibrary.models.TableObjectUploadStatus
-import kotlinx.coroutines.experimental.Deferred
-import kotlinx.coroutines.experimental.GlobalScope
-import kotlinx.coroutines.experimental.async
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.async
 import java.io.File
 import java.util.*
 import kotlin.collections.ArrayList
@@ -17,7 +17,7 @@ import kotlin.collections.ArrayList
 
 object Dav {
     private const val apiBaseUrlProduction = "https://dav-backend.herokuapp.com/v1/"
-    private const val apiBaseUrlDevelopment = "https://26796d96.ngrok.io/v1/"
+    private const val apiBaseUrlDevelopment = "https://e830cd7e.ngrok.io/v1/"
     val apiBaseUrl = if(environment == DavEnvironment.Production) apiBaseUrlProduction else apiBaseUrlDevelopment
     const val databaseName = "dav.db"
     var database: DavDatabase? = null
@@ -44,7 +44,7 @@ object Dav {
     }
 
     object Database{
-        fun createTableObject(tableObject: TableObject) : Deferred<Long>{
+        fun createTableObject(tableObject: TableObject) : Deferred<Long> {
             return GlobalScope.async {
                 database?.tableObjectDao()?.insertTableObject(TableObject.convertTableObjectToTableObjectEntity(tableObject)) ?: 0
             }

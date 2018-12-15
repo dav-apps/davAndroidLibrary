@@ -4,11 +4,11 @@ apply plugin: 'kotlin-android-extensions'
 apply plugin: 'kotlin-kapt'
 
 android {
-    compileSdkVersion 27
+    compileSdkVersion 28
 
     defaultConfig {
         minSdkVersion 23
-        targetSdkVersion 27
+        targetSdkVersion 28
         versionCode 1
         versionName "0.1"
 
@@ -22,11 +22,6 @@ android {
         }
     }
 }
-kotlin {
-    experimental {
-        coroutines "enable"
-    }
-}
 
 dependencies {
     def roomVersion = "1.1.1"
@@ -34,7 +29,7 @@ dependencies {
 
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
-    implementation 'com.android.support:appcompat-v7:27.1.1'
+    implementation 'com.android.support:appcompat-v7:28.0.0'
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'com.android.support.test:runner:1.0.2'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
@@ -47,7 +42,7 @@ dependencies {
     implementation "android.arch.lifecycle:extensions:" + lifecycleVersion
 
     // Kotlin Coroutines
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:0.26.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.0.1'
 
     // OkHttp for http requests
     implementation 'com.squareup.okhttp3:okhttp:3.12.0'
