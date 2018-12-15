@@ -17,13 +17,14 @@ import kotlin.collections.ArrayList
 
 object Dav {
     private const val apiBaseUrlProduction = "https://dav-backend.herokuapp.com/v1/"
-    private const val apiBaseUrlDevelopment = "https://e830cd7e.ngrok.io/v1/"
-    val apiBaseUrl = if(environment == DavEnvironment.Production) apiBaseUrlProduction else apiBaseUrlDevelopment
+    private const val apiBaseUrlDevelopment = "https://e830cd.ngrok.io/v1/"
+
     const val databaseName = "dav.db"
     var database: DavDatabase? = null
     val dataPath: String
         get() = ProjectInterface.retrieveConstants?.getDataPath() ?: ""
-
+    val apiBaseUrl: String
+        get() = if(environment == DavEnvironment.Production) apiBaseUrlProduction else apiBaseUrlDevelopment
     val environment: DavEnvironment
         get() = ProjectInterface.generalMethods?.getEnvironment() ?: DavEnvironment.Development
 
