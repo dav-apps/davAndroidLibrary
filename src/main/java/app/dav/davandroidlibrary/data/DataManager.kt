@@ -1,5 +1,6 @@
 package app.dav.davandroidlibrary.data
 
+import android.arch.lifecycle.MutableLiveData
 import android.os.Handler
 import android.os.Looper
 import app.dav.davandroidlibrary.Dav
@@ -9,7 +10,6 @@ import app.dav.davandroidlibrary.models.*
 import kotlinx.coroutines.experimental.Deferred
 import kotlinx.coroutines.experimental.GlobalScope
 import kotlinx.coroutines.experimental.async
-import kotlinx.coroutines.experimental.channels.SendChannel
 import kotlinx.coroutines.experimental.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -29,7 +29,7 @@ class DataManager{
         // The list with the files that will be downloaded asap
         internal val fileDownloadQueue = ArrayList<TableObject>()
         // Contains the currently downloading files and the progress
-        internal val fileDownloadProgress = HashMap<UUID, SendChannel<Int>>()
+        internal val fileDownloadProgress = HashMap<UUID, MutableLiveData<Int>>()
         private val downloadHandler = Handler(Looper.getMainLooper())
         private val downloadRunnable = Runnable { GlobalScope.launch { downloadFilesTimerElapsed() } }
 
@@ -300,7 +300,7 @@ class DataManager{
             // Check if there are files to download
             if(fileDownloadProgress.count() < downloadFilesSimultaneously && fileDownloadQueue.count() > 0 &&
                     fileDownloadQueue.first().downloadStatus == TableObjectDownloadStatus.NotDownloaded){
-                fileDownloadQueue.first().downloadFile().await()
+                fileDownloadQueue.first().downloadFile(null).await()
             }
 
             if(fileDownloadQueue.count() > 0)
