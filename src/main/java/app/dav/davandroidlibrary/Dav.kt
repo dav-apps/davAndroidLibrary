@@ -7,9 +7,7 @@ import app.dav.davandroidlibrary.models.Property
 import app.dav.davandroidlibrary.models.PropertyEntity
 import app.dav.davandroidlibrary.models.TableObject
 import app.dav.davandroidlibrary.models.TableObjectUploadStatus
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
+import kotlinx.coroutines.*
 import java.io.File
 import java.util.*
 import kotlin.collections.ArrayList
@@ -45,88 +43,118 @@ object Dav {
     }
 
     object Database{
-        fun createTableObject(tableObject: TableObject) : Deferred<Long> {
-            return GlobalScope.async {
-                database?.tableObjectDao()?.insertTableObject(TableObject.convertTableObjectToTableObjectEntity(tableObject)) ?: 0
-            }
+        private fun createTableObjectAsync(tableObject: TableObject, scope: CoroutineScope): Deferred<Long> = scope.async {
+            database?.tableObjectDao()?.insertTableObject(TableObject.convertTableObjectToTableObjectEntity(tableObject)) ?: 0
         }
 
-        fun createTableObjectWithProperties(tableObject: TableObject) : Deferred<Long>{
-            return GlobalScope.async {
-                val tableObjectEntity = TableObject.convertTableObjectToTableObjectEntity(tableObject)
-                val id = database?.tableObjectDao()?.insertTableObject(tableObjectEntity) ?: 0
-                if(!id.equals(0)){
-                    for(property in tableObject.properties){
-                        property.tableObjectId = id
-                        property.id = database?.propertyDao()?.insertProperty(Property.convertPropertyToPropertyEntity(property)) ?: 0
-                    }
+        fun createTableObjectAsync(tableObject: TableObject) : Deferred<Long> = createTableObjectAsync(tableObject, GlobalScope)
+
+        suspend fun createTableObject(tableObject: TableObject) = coroutineScope {
+            createTableObjectAsync(tableObject, this).await()
+        }
+
+        private fun createTableObjectWithPropertiesAsync(tableObject: TableObject, scope: CoroutineScope) : Deferred<Long> = scope.async {
+            val tableObjectEntity = TableObject.convertTableObjectToTableObjectEntity(tableObject)
+            val id = database?.tableObjectDao()?.insertTableObject(tableObjectEntity) ?: 0
+            if(!id.equals(0)){
+                for(property in tableObject.properties){
+                    property.tableObjectId = id
+                    property.id = database?.propertyDao()?.insertProperty(Property.convertPropertyToPropertyEntity(property)) ?: 0
                 }
-                id
             }
+            id
         }
 
-        fun getTableObject(uuid: UUID) : Deferred<TableObject?>{
-            return GlobalScope.async {
-                val tableObjectEntity = database?.tableObjectDao()?.getTableObject(uuid.toString())
-                if(tableObjectEntity != null){
-                    val tableObject = TableObject.convertTableObjectEntityToTableObject(tableObjectEntity)
-                    tableObject.load()
-                    tableObject
-                }else null
+        fun createTableObjectWithPropertiesAsync(tableObject: TableObject) : Deferred<Long> = createTableObjectWithPropertiesAsync(tableObject, GlobalScope)
+
+        suspend fun createTableObjectWithProperties(tableObject: TableObject) : Long = coroutineScope {
+            createTableObjectWithPropertiesAsync(tableObject, this).await()
+        }
+
+        private fun getTableObjectAsync(uuid: UUID, scope: CoroutineScope) : Deferred<TableObject?> = scope.async {
+            val tableObjectEntity = database?.tableObjectDao()?.getTableObject(uuid.toString())
+            if(tableObjectEntity != null){
+                val tableObject = TableObject.convertTableObjectEntityToTableObject(tableObjectEntity)
+                tableObject.load()
+                tableObject
+            }else null
+        }
+
+        fun getTableObjectAsync(uuid: UUID) : Deferred<TableObject?> = getTableObjectAsync(uuid, GlobalScope)
+
+        suspend fun getTableObject(uuid: UUID) : TableObject? = coroutineScope {
+            getTableObjectAsync(uuid, this).await()
+        }
+
+        private fun getAllTableObjectsAsync(deleted: Boolean, scope: CoroutineScope) : Deferred<ArrayList<TableObject>> = scope.async {
+            val db = database
+            val tableObjectEntities = if(db != null) db.tableObjectDao().getTableObjects() else listOf()
+            val tableObjects = ArrayList<TableObject>()
+
+            for(obj in tableObjectEntities){
+                val tableObject = TableObject.convertTableObjectEntityToTableObject(obj)
+
+                if(!deleted && tableObject.uploadStatus == TableObjectUploadStatus.Deleted) continue
+
+                tableObject.load()
+                tableObjects.add(tableObject)
             }
+
+            tableObjects
         }
 
-        fun getAllTableObjects(deleted: Boolean) : Deferred<ArrayList<TableObject>>{
-            return GlobalScope.async {
-                val db = database
-                val tableObjectEntities = if(db != null) db.tableObjectDao().getTableObjects() else listOf()
-                val tableObjects = ArrayList<TableObject>()
+        fun getAllTableObjectsAsync(deleted: Boolean) : Deferred<ArrayList<TableObject>> = getAllTableObjectsAsync(deleted, GlobalScope)
 
-                for(obj in tableObjectEntities){
-                    val tableObject = TableObject.convertTableObjectEntityToTableObject(obj)
+        suspend fun getAllTableObjects(deleted: Boolean) : ArrayList<TableObject> = coroutineScope {
+            getAllTableObjectsAsync(deleted, this).await()
+        }
 
-                    if(!deleted && tableObject.uploadStatus == TableObjectUploadStatus.Deleted) continue
+        private fun getAllTableObjectsAsync(tableId: Int, deleted: Boolean, scope: CoroutineScope) : Deferred<ArrayList<TableObject>> = scope.async {
+            val db = database
+            val tableObjectEntities = if(db != null) db.tableObjectDao().getTableObjects() else listOf()
+            val tableObjects = ArrayList<TableObject>()
 
-                    tableObject.load()
-                    tableObjects.add(tableObject)
-                }
+            for (obj in tableObjectEntities){
+                val tableObject = TableObject.convertTableObjectEntityToTableObject(obj)
 
-                tableObjects
+                if((!deleted && tableObject.uploadStatus == TableObjectUploadStatus.Deleted) ||
+                        tableObject.tableId != tableId) continue
+
+                tableObject.load()
+                tableObjects.add(tableObject)
             }
+
+            tableObjects
         }
 
-        fun getAllTableObjects(tableId: Int, deleted: Boolean) : Deferred<ArrayList<TableObject>>{
-            return GlobalScope.async {
-                val db = database
-                val tableObjectEntities = if(db != null) db.tableObjectDao().getTableObjects() else listOf()
-                val tableObjects = ArrayList<TableObject>()
+        fun getAllTableObjectsAsync(tableId: Int, deleted: Boolean) : Deferred<ArrayList<TableObject>> = getAllTableObjectsAsync(tableId, deleted, GlobalScope)
 
-                for (obj in tableObjectEntities){
-                    val tableObject = TableObject.convertTableObjectEntityToTableObject(obj)
-
-                    if((!deleted && tableObject.uploadStatus == TableObjectUploadStatus.Deleted) ||
-                            tableObject.tableId != tableId) continue
-
-                    tableObject.load()
-                    tableObjects.add(tableObject)
-                }
-
-                tableObjects
-            }
+        suspend fun getAllTableObjects(tableId: Int, deleted: Boolean) : ArrayList<TableObject> = coroutineScope {
+            getAllTableObjectsAsync(tableId, deleted, this).await()
         }
 
-        suspend fun updateTableObject(tableObject: TableObject){
-            GlobalScope.async { database?.tableObjectDao()?.updateTableObject(TableObject.convertTableObjectToTableObjectEntity(tableObject)) }.await()
+        private fun updateTableObjectAsync(tableObject: TableObject, scope: CoroutineScope) : Deferred<Unit?> = scope.async {
+            database?.tableObjectDao()?.updateTableObject(TableObject.convertTableObjectToTableObjectEntity(tableObject))
         }
 
-        fun tableObjectExists(uuid: UUID) : Deferred<Boolean>{
-            return GlobalScope.async {
-                database?.tableObjectDao()?.getTableObject(uuid.toString()) != null
-            }
+        fun updateTableObjectAsync(tableObject: TableObject) : Deferred<Unit?> = updateTableObjectAsync(tableObject, GlobalScope)
+
+        suspend fun updateTableObject(tableObject: TableObject) : Unit? = coroutineScope {
+            updateTableObjectAsync(tableObject, this).await()
         }
 
-        suspend fun deleteTableObject(uuid: UUID){
-            val tableObject = getTableObject(uuid).await() ?: return
+        private fun tableObjectExistsAsync(uuid: UUID, scope: CoroutineScope) : Deferred<Boolean> = scope.async {
+            database?.tableObjectDao()?.getTableObject(uuid.toString()) != null
+        }
+
+        fun tableObjectExistsAsync(uuid: UUID) : Deferred<Boolean> = tableObjectExistsAsync(uuid, GlobalScope)
+
+        suspend fun tableObjectExists(uuid: UUID) : Boolean = coroutineScope {
+            tableObjectExistsAsync(uuid, this).await()
+        }
+
+        private fun deleteTableObjectAsync(uuid: UUID, scope: CoroutineScope) : Deferred<Unit> = scope.async {
+            val tableObject = getTableObjectAsync(uuid).await() ?: return@async
 
             if(tableObject.uploadStatus == TableObjectUploadStatus.Deleted){
                 deleteTableObjectImmediately(uuid)
@@ -135,39 +163,71 @@ object Dav {
             }
         }
 
-        suspend fun deleteTableObjectImmediately(uuid: UUID){
-            val tableObject = getTableObject(uuid).await() ?: return
+        fun deleteTableObjectAsync(uuid: UUID) : Deferred<Unit> = deleteTableObjectAsync(uuid, GlobalScope)
+
+        suspend fun deleteTableObject(uuid: UUID) : Unit = coroutineScope {
+            deleteTableObjectAsync(uuid, this).await()
+        }
+
+        private fun deleteTableObjectImmediatelyAsync(uuid: UUID, scope: CoroutineScope) : Deferred<Unit?> = scope.async {
+            val tableObject = getTableObjectAsync(uuid).await() ?: return@async
             val tableObjectEntity = TableObject.convertTableObjectToTableObjectEntity(tableObject)
             GlobalScope.async { database?.tableObjectDao()?.deleteTableObject(tableObjectEntity) }.await()
         }
 
-        suspend fun createProperty(property: Property){
-            GlobalScope.async { database?.propertyDao()?.insertProperty(Property.convertPropertyToPropertyEntity(property)) }.await()
+        fun deleteTableObjectImmediatelyAsync(uuid: UUID) : Deferred<Unit?> = deleteTableObjectImmediatelyAsync(uuid, GlobalScope)
+
+        suspend fun deleteTableObjectImmediately(uuid: UUID) : Unit? = coroutineScope {
+            deleteTableObjectAsync(uuid, this).await()
         }
 
-        fun getPropertiesOfTableObject(tableObjectId: Long) : Deferred<ArrayList<Property>>{
-            return GlobalScope.async {
-                val db = database
-                val propertyEntries: List<PropertyEntity> = if(db != null) db.propertyDao().getPropertiesOfTableObject(tableObjectId) else listOf<PropertyEntity>()
-                val properties = ArrayList<Property>()
+        private fun createPropertyAsync(property: Property, scope: CoroutineScope) : Deferred<Long?> = scope.async {
+            database?.propertyDao()?.insertProperty(Property.convertPropertyToPropertyEntity(property))
+        }
 
-                for(propertyEntry in propertyEntries){
-                    val property = Property.convertPropertyEntityToProperty(propertyEntry)
-                    properties.add(property)
-                }
+        fun createPropertyAsync(property: Property) : Deferred<Long?> = createPropertyAsync(property, GlobalScope)
 
-                properties
+        suspend fun createProperty(property: Property) : Long? = coroutineScope {
+            createPropertyAsync(property, this).await()
+        }
+
+        private fun getPropertiesOfTableObjectAsync(tableObjectId: Long, scope: CoroutineScope) : Deferred<ArrayList<Property>> = scope.async {
+            val db = database
+            val propertyEntries: List<PropertyEntity> = if(db != null) db.propertyDao().getPropertiesOfTableObject(tableObjectId) else listOf<PropertyEntity>()
+            val properties = ArrayList<Property>()
+
+            for(propertyEntry in propertyEntries){
+                val property = Property.convertPropertyEntityToProperty(propertyEntry)
+                properties.add(property)
             }
+
+            properties
         }
 
-        suspend fun updateProperty(property: Property){
-            GlobalScope.async { database?.propertyDao()?.updateProperty(Property.convertPropertyToPropertyEntity(property)) }.await()
+        fun getPropertiesOfTableObjectAsync(tableObjectId: Long) : Deferred<ArrayList<Property>> = getPropertiesOfTableObjectAsync(tableObjectId, GlobalScope)
+
+        suspend fun getPropertiesOfTableObject(tableObjectId: Long) : ArrayList<Property> = coroutineScope {
+            getPropertiesOfTableObjectAsync(tableObjectId, this).await()
         }
 
-        fun propertyExists(id: Long) : Deferred<Boolean>{
-            return GlobalScope.async {
-                database?.propertyDao()?.getProperty(id) != null
-            }
+        private fun updatePropertyAsync(property: Property, scope: CoroutineScope) : Deferred<Unit?> = scope.async {
+            database?.propertyDao()?.updateProperty(Property.convertPropertyToPropertyEntity(property))
+        }
+
+        fun updatePropertyAsync(property: Property) : Deferred<Unit?> = updatePropertyAsync(property, GlobalScope)
+
+        suspend fun updateProperty(property: Property) : Unit? = coroutineScope {
+            updatePropertyAsync(property, this).await()
+        }
+
+        private fun propertyExistsAsync(id: Long, scope: CoroutineScope) : Deferred<Boolean> = scope.async {
+            database?.propertyDao()?.getProperty(id) != null
+        }
+
+        fun propertyExistsAsync(id: Long) : Deferred<Boolean> = propertyExistsAsync(id, GlobalScope)
+
+        suspend fun propertyExists(id: Long) : Boolean = coroutineScope {
+            propertyExistsAsync(id, this).await()
         }
 
         fun getTableFolder(tableId: Int) : File{

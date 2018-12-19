@@ -68,8 +68,8 @@ class TableObject{
 
     internal suspend fun save(){
         // Check if the table object already exists
-        if(!Dav.Database.tableObjectExists(uuid).await()){
-            id = Dav.Database.createTableObject(this).await()
+        if(!Dav.Database.tableObjectExistsAsync(uuid).await()){
+            id = Dav.Database.createTableObjectAsync(this).await()
         }else{
             Dav.Database.updateTableObject(this)
         }
@@ -77,10 +77,10 @@ class TableObject{
 
     internal suspend fun saveWithProperties(){
         // Check if the table object already exists
-        if(!Dav.Database.tableObjectExists(uuid).await()){
-            id = Dav.Database.createTableObjectWithProperties(this).await()
+        if(!Dav.Database.tableObjectExistsAsync(uuid).await()){
+            id = Dav.Database.createTableObjectWithPropertiesAsync(this).await()
         }else{
-            val tableObject = Dav.Database.getTableObject(uuid).await()
+            val tableObject = Dav.Database.getTableObjectAsync(uuid).await()
 
             if(tableObject != null){
                 id = tableObject.id
@@ -102,7 +102,7 @@ class TableObject{
 
     private suspend fun loadProperties(){
         properties.clear()
-        for (property in Dav.Database.getPropertiesOfTableObject(id).await()){
+        for (property in Dav.Database.getPropertiesOfTableObjectAsync(id).await()){
             properties.add(property)
         }
     }

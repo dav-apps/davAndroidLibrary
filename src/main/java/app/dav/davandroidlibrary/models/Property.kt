@@ -42,7 +42,7 @@ class Property{
     private suspend fun save(){
         // Check if the table object already exists
         if(tableObjectId != 0L){
-            if(!Dav.Database.propertyExists(id).await()){
+            if(!Dav.Database.propertyExistsAsync(id).await()){
                 Dav.Database.createProperty(this)
             }else{
                 Dav.Database.updateProperty(this)
