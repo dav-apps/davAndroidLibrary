@@ -38,6 +38,9 @@ object Dav {
     const val planKey = "dav.plan"
     const val avatarEtagKey = "dav.avatarEtag"
 
+    private val databaseJob = Job()
+    private val databaseScope = CoroutineScope(Dispatchers.Default + databaseJob)
+
     fun init(context: Context){
         database = DavDatabase.getInstance(context)
     }
@@ -47,7 +50,7 @@ object Dav {
             database?.tableObjectDao()?.insertTableObject(TableObject.convertTableObjectToTableObjectEntity(tableObject)) ?: 0
         }
 
-        fun createTableObjectAsync(tableObject: TableObject) : Deferred<Long> = createTableObjectAsync(tableObject, GlobalScope)
+        fun createTableObjectAsync(tableObject: TableObject) : Deferred<Long> = createTableObjectAsync(tableObject, databaseScope)
 
         suspend fun createTableObject(tableObject: TableObject) = coroutineScope {
             createTableObjectAsync(tableObject, this).await()
@@ -65,7 +68,7 @@ object Dav {
             id
         }
 
-        fun createTableObjectWithPropertiesAsync(tableObject: TableObject) : Deferred<Long> = createTableObjectWithPropertiesAsync(tableObject, GlobalScope)
+        fun createTableObjectWithPropertiesAsync(tableObject: TableObject) : Deferred<Long> = createTableObjectWithPropertiesAsync(tableObject, databaseScope)
 
         suspend fun createTableObjectWithProperties(tableObject: TableObject) : Long = coroutineScope {
             createTableObjectWithPropertiesAsync(tableObject, this).await()
@@ -80,7 +83,7 @@ object Dav {
             }else null
         }
 
-        fun getTableObjectAsync(uuid: UUID) : Deferred<TableObject?> = getTableObjectAsync(uuid, GlobalScope)
+        fun getTableObjectAsync(uuid: UUID) : Deferred<TableObject?> = getTableObjectAsync(uuid, databaseScope)
 
         suspend fun getTableObject(uuid: UUID) : TableObject? = coroutineScope {
             getTableObjectAsync(uuid, this).await()
@@ -103,7 +106,7 @@ object Dav {
             tableObjects
         }
 
-        fun getAllTableObjectsAsync(deleted: Boolean) : Deferred<ArrayList<TableObject>> = getAllTableObjectsAsync(deleted, GlobalScope)
+        fun getAllTableObjectsAsync(deleted: Boolean) : Deferred<ArrayList<TableObject>> = getAllTableObjectsAsync(deleted, databaseScope)
 
         suspend fun getAllTableObjects(deleted: Boolean) : ArrayList<TableObject> = coroutineScope {
             getAllTableObjectsAsync(deleted, this).await()
@@ -127,7 +130,7 @@ object Dav {
             tableObjects
         }
 
-        fun getAllTableObjectsAsync(tableId: Int, deleted: Boolean) : Deferred<ArrayList<TableObject>> = getAllTableObjectsAsync(tableId, deleted, GlobalScope)
+        fun getAllTableObjectsAsync(tableId: Int, deleted: Boolean) : Deferred<ArrayList<TableObject>> = getAllTableObjectsAsync(tableId, deleted, databaseScope)
 
         suspend fun getAllTableObjects(tableId: Int, deleted: Boolean) : ArrayList<TableObject> = coroutineScope {
             getAllTableObjectsAsync(tableId, deleted, this).await()
@@ -137,7 +140,7 @@ object Dav {
             database?.tableObjectDao()?.updateTableObject(TableObject.convertTableObjectToTableObjectEntity(tableObject))
         }
 
-        fun updateTableObjectAsync(tableObject: TableObject) : Deferred<Unit?> = updateTableObjectAsync(tableObject, GlobalScope)
+        fun updateTableObjectAsync(tableObject: TableObject) : Deferred<Unit?> = updateTableObjectAsync(tableObject, databaseScope)
 
         suspend fun updateTableObject(tableObject: TableObject) : Unit? = coroutineScope {
             updateTableObjectAsync(tableObject, this).await()
@@ -147,7 +150,7 @@ object Dav {
             database?.tableObjectDao()?.getTableObject(uuid.toString()) != null
         }
 
-        fun tableObjectExistsAsync(uuid: UUID) : Deferred<Boolean> = tableObjectExistsAsync(uuid, GlobalScope)
+        fun tableObjectExistsAsync(uuid: UUID) : Deferred<Boolean> = tableObjectExistsAsync(uuid, databaseScope)
 
         suspend fun tableObjectExists(uuid: UUID) : Boolean = coroutineScope {
             tableObjectExistsAsync(uuid, this).await()
@@ -163,7 +166,7 @@ object Dav {
             }
         }
 
-        fun deleteTableObjectAsync(uuid: UUID) : Deferred<Unit> = deleteTableObjectAsync(uuid, GlobalScope)
+        fun deleteTableObjectAsync(uuid: UUID) : Deferred<Unit> = deleteTableObjectAsync(uuid, databaseScope)
 
         suspend fun deleteTableObject(uuid: UUID) : Unit = coroutineScope {
             deleteTableObjectAsync(uuid, this).await()
@@ -172,10 +175,10 @@ object Dav {
         private fun deleteTableObjectImmediatelyAsync(uuid: UUID, scope: CoroutineScope) : Deferred<Unit?> = scope.async {
             val tableObject = getTableObjectAsync(uuid).await() ?: return@async
             val tableObjectEntity = TableObject.convertTableObjectToTableObjectEntity(tableObject)
-            GlobalScope.async { database?.tableObjectDao()?.deleteTableObject(tableObjectEntity) }.await()
+            database?.tableObjectDao()?.deleteTableObject(tableObjectEntity)
         }
 
-        fun deleteTableObjectImmediatelyAsync(uuid: UUID) : Deferred<Unit?> = deleteTableObjectImmediatelyAsync(uuid, GlobalScope)
+        fun deleteTableObjectImmediatelyAsync(uuid: UUID) : Deferred<Unit?> = deleteTableObjectImmediatelyAsync(uuid, databaseScope)
 
         suspend fun deleteTableObjectImmediately(uuid: UUID) : Unit? = coroutineScope {
             deleteTableObjectAsync(uuid, this).await()
@@ -185,7 +188,7 @@ object Dav {
             database?.propertyDao()?.insertProperty(Property.convertPropertyToPropertyEntity(property))
         }
 
-        fun createPropertyAsync(property: Property) : Deferred<Long?> = createPropertyAsync(property, GlobalScope)
+        fun createPropertyAsync(property: Property) : Deferred<Long?> = createPropertyAsync(property, databaseScope)
 
         suspend fun createProperty(property: Property) : Long? = coroutineScope {
             createPropertyAsync(property, this).await()
@@ -204,7 +207,7 @@ object Dav {
             properties
         }
 
-        fun getPropertiesOfTableObjectAsync(tableObjectId: Long) : Deferred<ArrayList<Property>> = getPropertiesOfTableObjectAsync(tableObjectId, GlobalScope)
+        fun getPropertiesOfTableObjectAsync(tableObjectId: Long) : Deferred<ArrayList<Property>> = getPropertiesOfTableObjectAsync(tableObjectId, databaseScope)
 
         suspend fun getPropertiesOfTableObject(tableObjectId: Long) : ArrayList<Property> = coroutineScope {
             getPropertiesOfTableObjectAsync(tableObjectId, this).await()
@@ -214,7 +217,7 @@ object Dav {
             database?.propertyDao()?.updateProperty(Property.convertPropertyToPropertyEntity(property))
         }
 
-        fun updatePropertyAsync(property: Property) : Deferred<Unit?> = updatePropertyAsync(property, GlobalScope)
+        fun updatePropertyAsync(property: Property) : Deferred<Unit?> = updatePropertyAsync(property, databaseScope)
 
         suspend fun updateProperty(property: Property) : Unit? = coroutineScope {
             updatePropertyAsync(property, this).await()
@@ -224,7 +227,7 @@ object Dav {
             database?.propertyDao()?.getProperty(id) != null
         }
 
-        fun propertyExistsAsync(id: Long) : Deferred<Boolean> = propertyExistsAsync(id, GlobalScope)
+        fun propertyExistsAsync(id: Long) : Deferred<Boolean> = propertyExistsAsync(id, databaseScope)
 
         suspend fun propertyExists(id: Long) : Boolean = coroutineScope {
             propertyExistsAsync(id, this).await()
