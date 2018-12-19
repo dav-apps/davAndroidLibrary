@@ -7,10 +7,7 @@ import app.dav.davandroidlibrary.Dav
 import app.dav.davandroidlibrary.HttpResultEntry
 import app.dav.davandroidlibrary.common.ProjectInterface
 import app.dav.davandroidlibrary.models.*
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -21,6 +18,9 @@ import kotlin.collections.HashMap
 
 internal const val extPropertyName = "ext"
 private const val downloadFilesSimultaneously = 2
+
+private val syncJob = Job()
+private val syncScope = CoroutineScope(Dispatchers.Default + syncJob)
 
 class DataManager{
     companion object {
@@ -65,90 +65,65 @@ class DataManager{
             return folder
         }
 
-        internal suspend fun sync() : Deferred<Unit>{
-            return GlobalScope.async {
-                if(isSyncing) return@async
+        internal suspend fun sync() : Deferred<Unit> = syncScope.async {
+            if(isSyncing) return@async
 
-                isSyncing = true
-                val jwt = DavUser.getJwtFromSettings()
-                if(jwt.isEmpty()) return@async
-                fileDownloadQueue.clear()
-                fileDownloadProgress.clear()
+            isSyncing = true
+            val jwt = DavUser.getJwtFromSettings()
+            if(jwt.isEmpty()) return@async
+            fileDownloadQueue.clear()
+            fileDownloadProgress.clear()
 
-                // Get the specified tables
-                val tableIds = ProjectInterface.retrieveConstants?.getTableIds() ?: return@async
-                for(tableId in tableIds){
-                    var tableGetResult: HttpResultEntry
-                    var table: TableData
-                    var pages = 1
-                    var tableGetResultsOkay = true
-                    var tableChanged = false
+            // Get the specified tables
+            val tableIds = ProjectInterface.retrieveConstants?.getTableIds() ?: return@async
+            for(tableId in tableIds){
+                var tableGetResult: HttpResultEntry
+                var table: TableData
+                var tableGetResultsOkay = true
+                var tableChanged = false
 
-                    val removedTableObjectUuids: ArrayList<UUID> = ArrayList()
-                    for(tableObject in Dav.Database.getAllTableObjects(tableId, true).await())
-                        removedTableObjectUuids.add(tableObject.uuid)
+                val removedTableObjectUuids: ArrayList<UUID> = ArrayList()
+                for(tableObject in Dav.Database.getAllTableObjectsAsync(tableId, true).await())
+                    removedTableObjectUuids.add(tableObject.uuid)
 
-                    for(i in 1 until (pages + 1)){
-                        // Get the next page of the table
-                        tableGetResult = httpGet(jwt, "apps/table/$tableId?page=$i").await()
-                        if(!tableGetResult.key){
-                            tableGetResultsOkay = false
-                            continue
-                        }
+                var pages = 1
+                var i = 1
 
-                        table = TableData(tableGetResult.value)
-                        pages = table.pages
-                        val tableObjects = table.table_objects ?: continue
+                while (i <= pages){
+                    // Get the next page of the table
+                    tableGetResult = httpGet(jwt, "apps/table/$tableId?page=$i").await()
+                    if(!tableGetResult.key){
+                        tableGetResultsOkay = false
+                        continue
+                    }
 
-                        // Get the objects of the table
-                        for(obj in tableObjects){
-                            removedTableObjectUuids.remove(obj.uuid)
+                    table = TableData(tableGetResult.value)
+                    pages = table.pages
+                    val tableObjects = table.table_objects ?: continue
 
-                            // Is obj in the database?
-                            val currentTableObject = Dav.Database.getTableObject(obj.uuid).await()
-                            if(currentTableObject != null){
-                                // Is the etag correct?
-                                if(obj.etag == currentTableObject.etag){
-                                    // Is it a file?
-                                    if(currentTableObject.isFile){
-                                        // Was the file downloaded?
-                                        if(!currentTableObject.fileDownloaded()){
-                                            // Download the file
-                                            fileDownloadQueue.add(currentTableObject)
-                                        }
-                                    }
-                                }else{
-                                    // GET the table object
-                                    val tableObject = downloadTableObject(currentTableObject.uuid) ?: continue
-                                    tableObject.uploadStatus = TableObjectUploadStatus.UpToDate
+                    // Get the objects of the table
+                    for(obj in tableObjects){
+                        removedTableObjectUuids.remove(obj.uuid)
 
-                                    // Is it a file?
-                                    if(tableObject.isFile){
-                                        // Remove all properties except ext
-                                        val removingProperties = ArrayList<Property>()
-                                        for(p in tableObject.properties)
-                                            if(p.name != extPropertyName) removingProperties.add(p)
-
-                                        for(p in removingProperties)
-                                            tableObject.properties.remove(p)
-
-                                        // Save the ext property
-                                        tableObject.saveWithProperties()
-
+                        // Is obj in the database?
+                        val currentTableObject = Dav.Database.getTableObjectAsync(obj.uuid).await()
+                        if(currentTableObject != null){
+                            // Is the etag correct?
+                            if(obj.etag == currentTableObject.etag){
+                                // Is it a file?
+                                if(currentTableObject.isFile){
+                                    // Was the file downloaded?
+                                    if(!currentTableObject.fileDownloaded()){
                                         // Download the file
-                                        fileDownloadQueue.add(tableObject)
-                                    }else{
-                                        // Save the table object
-                                        tableObject.saveWithProperties()
-                                        ProjectInterface.triggerAction?.updateTableObject(tableObject, false)
-                                        tableChanged = true
+                                        fileDownloadQueue.add(currentTableObject)
                                     }
                                 }
                             }else{
                                 // GET the table object
-                                val tableObject = downloadTableObject(obj.uuid) ?: continue
+                                val tableObject = downloadTableObject(currentTableObject.uuid) ?: continue
                                 tableObject.uploadStatus = TableObjectUploadStatus.UpToDate
 
+                                // Is it a file?
                                 if(tableObject.isFile){
                                     // Remove all properties except ext
                                     val removingProperties = ArrayList<Property>()
@@ -158,13 +133,11 @@ class DataManager{
                                     for(p in removingProperties)
                                         tableObject.properties.remove(p)
 
+                                    // Save the ext property
                                     tableObject.saveWithProperties()
 
                                     // Download the file
                                     fileDownloadQueue.add(tableObject)
-
-                                    ProjectInterface.triggerAction?.updateTableObject(tableObject, false)
-                                    tableChanged = true
                                 }else{
                                     // Save the table object
                                     tableObject.saveWithProperties()
@@ -172,39 +145,67 @@ class DataManager{
                                     tableChanged = true
                                 }
                             }
+                        }else{
+                            // GET the table object
+                            val tableObject = downloadTableObject(obj.uuid) ?: continue
+                            tableObject.uploadStatus = TableObjectUploadStatus.UpToDate
+
+                            if(tableObject.isFile){
+                                // Remove all properties except ext
+                                val removingProperties = ArrayList<Property>()
+                                for(p in tableObject.properties)
+                                    if(p.name != extPropertyName) removingProperties.add(p)
+
+                                for(p in removingProperties)
+                                    tableObject.properties.remove(p)
+
+                                tableObject.saveWithProperties()
+
+                                // Download the file
+                                fileDownloadQueue.add(tableObject)
+
+                                ProjectInterface.triggerAction?.updateTableObject(tableObject, false)
+                                tableChanged = true
+                            }else{
+                                // Save the table object
+                                tableObject.saveWithProperties()
+                                ProjectInterface.triggerAction?.updateTableObject(tableObject, false)
+                                tableChanged = true
+                            }
                         }
                     }
-
-                    if(!tableGetResultsOkay) continue
-
-                    // RemovedTableObjects now includes all objects that were deleted on the server but not locally
-                    // Delete those objects locally
-                    for(objUuid in removedTableObjectUuids){
-                        val obj = Dav.Database.getTableObject(objUuid).await() ?: continue
-
-                        if(obj.uploadStatus == TableObjectUploadStatus.New && obj.isFile){
-                            if(obj.fileDownloaded())
-                                continue
-                        }else if(obj.uploadStatus == TableObjectUploadStatus.New ||
-                                obj.uploadStatus == TableObjectUploadStatus.NoUpload ||
-                                obj.uploadStatus == TableObjectUploadStatus.Deleted){
-                            continue
-                        }
-
-                        obj.deleteImmediately()
-                        ProjectInterface.triggerAction?.deleteTableObject(obj)
-                        tableChanged = true
-                    }
-
-                    if(tableChanged)
-                        ProjectInterface.triggerAction?.updateAllOfTable(tableId)
+                    i++
                 }
-                isSyncing = false
 
-                // Push changes
-                syncPush().await()
-                downloadFiles()
+                if(!tableGetResultsOkay) continue
+
+                // RemovedTableObjects now includes all objects that were deleted on the server but not locally
+                // Delete those objects locally
+                for(objUuid in removedTableObjectUuids){
+                    val obj = Dav.Database.getTableObjectAsync(objUuid).await() ?: continue
+
+                    if(obj.uploadStatus == TableObjectUploadStatus.New && obj.isFile){
+                        if(obj.fileDownloaded())
+                            continue
+                    }else if(obj.uploadStatus == TableObjectUploadStatus.New ||
+                            obj.uploadStatus == TableObjectUploadStatus.NoUpload ||
+                            obj.uploadStatus == TableObjectUploadStatus.Deleted){
+                        continue
+                    }
+
+                    obj.deleteImmediately()
+                    ProjectInterface.triggerAction?.deleteTableObject(obj)
+                    tableChanged = true
+                }
+
+                if(tableChanged)
+                    ProjectInterface.triggerAction?.updateAllOfTable(tableId)
             }
+            isSyncing = false
+
+            // Push changes
+            syncPush().await()
+            downloadFiles()
         }
 
         internal suspend fun syncPush() : Deferred<Unit> {
@@ -218,7 +219,7 @@ class DataManager{
                 if(jwt.isEmpty()) return@async
 
                 isSyncing = true
-                val tableObjects = Dav.Database.getAllTableObjects(true).await().filter {
+                val tableObjects = Dav.Database.getAllTableObjectsAsync(true).await().filter {
                     it.uploadStatus != TableObjectUploadStatus.NoUpload &&
                             it.uploadStatus != TableObjectUploadStatus.UpToDate
                 }.sortedBy { it.id }
