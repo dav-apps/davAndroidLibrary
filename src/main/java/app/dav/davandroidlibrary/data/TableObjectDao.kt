@@ -8,13 +8,13 @@ interface TableObjectDao {
     @Insert()
     fun insertTableObject(tableObject: TableObjectEntity) : Long
 
-    @Query("SELECT * FROM TableObject;")
+    @Transaction @Query("SELECT * FROM TableObject;")
     fun getTableObjects() : List<TableObjectEntity>
 
-    @Query("SELECT * FROM TableObject WHERE id == :id;")
+    @Transaction @Query("SELECT * FROM TableObject WHERE id == :id;")
     fun getTableObject(id: Long) : TableObjectEntity
 
-    @Query("SELECT * FROM TableObject WHERE uuid == :uuid;")
+    @Transaction @Query("SELECT * FROM TableObject WHERE uuid == :uuid;")
     fun getTableObject(uuid: String) : TableObjectEntity
 
     @Update()
