@@ -225,103 +225,90 @@ class TableObject{
         return DataManager.fileDownloadProgress[uuid]
     }
 
-    fun downloadFile(reportProgress: ((progress: Int) -> Unit)?) : Deferred<Unit>{
-        return GlobalScope.async {
-            val jwt = DavUser.getJwtFromSettings()
-            if(downloadStatus == TableObjectDownloadStatus.Downloading){
-                // The file is already downloading, return the progress
-                val progressLiveData = DataManager.fileDownloadProgress[uuid]
-                if(progressLiveData == null){
-                    reportProgress?.invoke(-1)
-                }else{
-                    var i = 0
-                    progressLiveData.observeForever {
-                        if(it == null){
-                            reportProgress?.invoke(-1)
-                            return@observeForever
-                        }else{
-                            reportProgress?.invoke(it)
-                            i = it
-                        }
-                    }
-
-                    // Delay the thread until the download is finished
-                    while (i in 0..99){
-                        delay(500)
-                    }
-
-                    // Try to get the file
-                    loadFile()
-                }
-                return@async
-            }else if (downloadStatus != TableObjectDownloadStatus.NotDownloaded || jwt.isEmpty()){
+    fun downloadFile(reportProgress: ((progress: Int) -> Unit)?) : Deferred<Unit> = GlobalScope.async {
+        val jwt = DavUser.getJwtFromSettings()
+        if(downloadStatus == TableObjectDownloadStatus.Downloading){
+            // The file is already downloading, return the progress
+            val progressLiveData = DataManager.fileDownloadProgress[uuid]
+            if(progressLiveData == null){
                 reportProgress?.invoke(-1)
-                return@async
-            }
-
-            // Add the download progress to the list in DataManager
-            DataManager.fileDownloadProgress.put(uuid, MutableLiveData())
-
-            // Start the download
-            val url = "${Dav.apiBaseUrl}apps/object/$uuid?file=true"
-
-            // Remove the table object from the queue
-            DataManager.fileDownloadQueue.remove(this@TableObject)
-
-            try {
-                val client = OkHttpClient()
-                val request = Request.Builder()
-                        .url(url)
-                        .header("Authorization", jwt)
-                        .build()
-
-                val response = client.newCall(request).execute()
-                if(response.isSuccessful){
-                    val byteStream: InputStream = response.body()?.byteStream() ?: return@async
-                    val tempFile = File.createTempFile(uuid.toString(), null)
-
-                    tempFile.copyInputStreamToFile(byteStream) {
-                        // Report the progress to the SendChannel and update the progress in the DataManager list
-                        GlobalScope.launch(Dispatchers.Main) {
-                            DataManager.fileDownloadProgress[uuid]?.value = it
-                        }
+            }else{
+                var i = 0
+                progressLiveData.observeForever {
+                    if(it == null){
+                        reportProgress?.invoke(-1)
+                        return@observeForever
+                    }else{
                         reportProgress?.invoke(it)
+                        i = it
                     }
-
-                    // Copy the temp file into the appropriate table folder
-                    val file = File(DataManager.getTableFolder(tableId), uuid.toString())
-                    tempFile.copyTo(file, true)
-                    this@TableObject.file = file
-
-                    // Notify subscribers that the download was finished
-                    GlobalScope.async(Dispatchers.Main) {
-                        DataManager.fileDownloadProgress[uuid]?.value = 100
-                        reportProgress?.invoke(100)
-
-                        DataManager.fileDownloadProgress.remove(uuid)
-                    }.await()
-                }else{
-                    reportProgress?.invoke(-1)
-                    Log.d("TableObject", "Error: ${response.body()?.string()}")
                 }
-            } catch (e: Exception) {
+
+                // Delay the thread until the download is finished
+                while (i in 0..99){
+                    delay(500)
+                }
+
+                // Try to get the file
+                loadFile()
+            }
+            return@async
+        }else if (downloadStatus != TableObjectDownloadStatus.NotDownloaded || jwt.isEmpty()){
+            reportProgress?.invoke(-1)
+            return@async
+        }
+
+        // Add the download progress to the list in DataManager
+        DataManager.fileDownloadProgress.put(uuid, MutableLiveData())
+
+        // Start the download
+        val url = "${Dav.apiBaseUrl}apps/object/$uuid?file=true"
+
+        // Remove the table object from the queue
+        DataManager.fileDownloadQueue.remove(this@TableObject)
+
+        try {
+            val client = OkHttpClient()
+            val request = Request.Builder()
+                    .url(url)
+                    .header("Authorization", jwt)
+                    .build()
+
+            val response = client.newCall(request).execute()
+            if(response.isSuccessful){
+                val byteStream: InputStream = response.body()?.byteStream() ?: return@async
+                val tempFile = File.createTempFile(uuid.toString(), null)
+
+                tempFile.copyInputStreamToFile(byteStream) {
+                    // Report the progress to the SendChannel and update the progress in the DataManager list
+                    GlobalScope.launch(Dispatchers.Main) {
+                        DataManager.fileDownloadProgress[uuid]?.value = it
+                    }
+                    reportProgress?.invoke(it)
+                }
+
+                // Copy the temp file into the appropriate table folder
+                val file = File(DataManager.getTableFolder(tableId), uuid.toString())
+                tempFile.copyTo(file, true)
+                this@TableObject.file = file
+
+                // Notify subscribers that the download was finished
+                GlobalScope.async(Dispatchers.Main) {
+                    DataManager.fileDownloadProgress[uuid]?.value = 100
+                    reportProgress?.invoke(100)
+
+                    DataManager.fileDownloadProgress.remove(uuid)
+                }.await()
+            }else{
                 reportProgress?.invoke(-1)
-                Log.d("TableObject", "There was an error when downloading the file: ${e.message}")
-            }finally {
-                DataManager.fileDownloadProgress.remove(uuid)
+                Log.d("TableObject", "Error: ${response.body()?.string()}")
             }
+        } catch (e: Exception) {
+            reportProgress?.invoke(-1)
+            Log.d("TableObject", "There was an error when downloading the file: ${e.message}")
+        }finally {
+            DataManager.fileDownloadProgress.remove(uuid)
         }
-    }
-
-    private fun File.copyInputStreamToFile(inputStream: InputStream, reportProgress: (progress: Int) -> Unit) {
-        // Return the progress as int between 0 and 100
-        inputStream.use { input ->
-            this.outputStream().use { fileOut ->
-                input.copyTo(fileOut)
-            }
-        }
-
-        reportProgress(50)
     }
 
     internal suspend fun createOnServer() : String?{
@@ -476,6 +463,17 @@ class TableObject{
             Log.d("TableObject", "Error in deleteOnServer: ${e.message}")
             return false
         }
+    }
+
+    private fun File.copyInputStreamToFile(inputStream: InputStream, reportProgress: (progress: Int) -> Unit) {
+        // Return the progress as int between 0 and 100
+        inputStream.use { input ->
+            this.outputStream().use { fileOut ->
+                input.copyTo(fileOut)
+            }
+        }
+
+        reportProgress(50)
     }
 
     companion object {

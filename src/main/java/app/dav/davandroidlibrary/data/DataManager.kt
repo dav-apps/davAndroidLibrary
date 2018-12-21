@@ -33,29 +33,27 @@ class DataManager{
         private val downloadHandler = Handler(Looper.getMainLooper())
         private val downloadRunnable = Runnable { GlobalScope.launch { downloadFilesTimerElapsed() } }
 
-        fun httpGet(jwt: String, url: String) : Deferred<HttpResultEntry> {
-            return GlobalScope.async {
-                val noInternetEntry = HttpResultEntry(false, "No internet connection")
-                val isNetworkAvailable = ProjectInterface.generalMethods?.isNetworkAvailable() ?: return@async noInternetEntry
-                if(!isNetworkAvailable) return@async noInternetEntry
+        fun httpGet(jwt: String, url: String) : Deferred<HttpResultEntry>  = GlobalScope.async {
+            val noInternetEntry = HttpResultEntry(false, "No internet connection")
+            val isNetworkAvailable = ProjectInterface.generalMethods?.isNetworkAvailable() ?: return@async noInternetEntry
+            if(!isNetworkAvailable) return@async noInternetEntry
 
-                val client = OkHttpClient()
-                val request = Request.Builder()
-                        .url(Dav.apiBaseUrl + url)
-                        .header("Authorization", jwt)
-                        .build()
+            val client = OkHttpClient()
+            val request = Request.Builder()
+                    .url(Dav.apiBaseUrl + url)
+                    .header("Authorization", jwt)
+                    .build()
 
-                try {
-                    val response = client.newCall(request).execute()
+            try {
+                val response = client.newCall(request).execute()
 
-                    if(response.isSuccessful){
-                        HttpResultEntry(true, response.body()?.string() ?: "")
-                    }else{
-                        HttpResultEntry(false, "There was an error")
-                    }
-                }catch (e: IOException){
-                    HttpResultEntry(false, e.message ?: "There was an error")
+                if(response.isSuccessful){
+                    HttpResultEntry(true, response.body()?.string() ?: "")
+                }else{
+                    HttpResultEntry(false, "There was an error")
                 }
+            }catch (e: IOException){
+                HttpResultEntry(false, e.message ?: "There was an error")
             }
         }
 
@@ -208,62 +206,60 @@ class DataManager{
             downloadFiles()
         }
 
-        internal suspend fun syncPush() : Deferred<Unit> {
-            return GlobalScope.async {
-                if(isSyncing){
-                    syncAgain = true
-                    return@async
-                }
+        internal suspend fun syncPush() : Deferred<Unit> = GlobalScope.async {
+            if(isSyncing){
+                syncAgain = true
+                return@async
+            }
 
-                val jwt = DavUser.getJwtFromSettings()
-                if(jwt.isEmpty()) return@async
+            val jwt = DavUser.getJwtFromSettings()
+            if(jwt.isEmpty()) return@async
 
-                isSyncing = true
-                val tableObjects = Dav.Database.getAllTableObjectsAsync(true).await().filter {
-                    it.uploadStatus != TableObjectUploadStatus.NoUpload &&
-                            it.uploadStatus != TableObjectUploadStatus.UpToDate
-                }.sortedBy { it.id }
+            isSyncing = true
+            val tableObjects = Dav.Database.getAllTableObjectsAsync(true).await().filter {
+                it.uploadStatus != TableObjectUploadStatus.NoUpload &&
+                        it.uploadStatus != TableObjectUploadStatus.UpToDate
+            }.sortedBy { it.id }
 
-                for(tableObject in tableObjects){
-                    if(tableObject.uploadStatus == TableObjectUploadStatus.New){
-                        // Check if the table object is a file and if it can be uploaded
-                        if(tableObject.isFile && tableObject.fileDownloaded()){
-                            val usedStorage = DavUser.getUsedStorageFromSettings()
-                            val totalStorage = DavUser.getTotalStorageFromSettings()
-                            val fileSize = tableObject.file?.length() ?: continue
+            for(tableObject in tableObjects){
+                if(tableObject.uploadStatus == TableObjectUploadStatus.New){
+                    // Check if the table object is a file and if it can be uploaded
+                    if(tableObject.isFile && tableObject.fileDownloaded()){
+                        val usedStorage = DavUser.getUsedStorageFromSettings()
+                        val totalStorage = DavUser.getTotalStorageFromSettings()
+                        val fileSize = tableObject.file?.length() ?: continue
 
-                            if(usedStorage + fileSize > totalStorage && totalStorage != 0L)
-                                continue
-                        }
-
-                        // Create the new object on the server
-                        val etag = tableObject.createOnServer() ?: continue
-                        if(etag.isEmpty()) continue
-
-                        tableObject.etag = etag
-                        tableObject.uploadStatus = TableObjectUploadStatus.UpToDate
-                        tableObject.save()
-                    }else if(tableObject.uploadStatus == TableObjectUploadStatus.Updated){
-                        // Update the object on the server
-                        val etag = tableObject.updateOnServer() ?: continue
-                        if(etag.isEmpty()) continue
-
-                        tableObject.etag = etag
-                        tableObject.uploadStatus = TableObjectUploadStatus.UpToDate
-                        tableObject.save()
-                    }else if(tableObject.uploadStatus == TableObjectUploadStatus.Deleted){
-                        // Delete the table object on the server
-                        if(tableObject.deleteOnServer())
-                            Dav.Database.deleteTableObject(tableObject.uuid)
+                        if(usedStorage + fileSize > totalStorage && totalStorage != 0L)
+                            continue
                     }
-                }
 
-                isSyncing = false
+                    // Create the new object on the server
+                    val etag = tableObject.createOnServer() ?: continue
+                    if(etag.isEmpty()) continue
 
-                if(syncAgain){
-                    syncAgain = false
-                    syncPush().await()
+                    tableObject.etag = etag
+                    tableObject.uploadStatus = TableObjectUploadStatus.UpToDate
+                    tableObject.save()
+                }else if(tableObject.uploadStatus == TableObjectUploadStatus.Updated){
+                    // Update the object on the server
+                    val etag = tableObject.updateOnServer() ?: continue
+                    if(etag.isEmpty()) continue
+
+                    tableObject.etag = etag
+                    tableObject.uploadStatus = TableObjectUploadStatus.UpToDate
+                    tableObject.save()
+                }else if(tableObject.uploadStatus == TableObjectUploadStatus.Deleted){
+                    // Delete the table object on the server
+                    if(tableObject.deleteOnServer())
+                        Dav.Database.deleteTableObject(tableObject.uuid)
                 }
+            }
+
+            isSyncing = false
+
+            if(syncAgain){
+                syncAgain = false
+                syncPush().await()
             }
         }
 
