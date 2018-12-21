@@ -15,7 +15,7 @@ import kotlin.collections.ArrayList
 
 object Dav {
     private const val apiBaseUrlProduction = "https://dav-backend.herokuapp.com/v1/"
-    private const val apiBaseUrlDevelopment = "https://e830cd.ngrok.io/v1/"
+    private const val apiBaseUrlDevelopment = "https://adc068d5.ngrok.io/v1/"
 
     const val databaseName = "dav.db"
     var database: DavDatabase? = null
@@ -181,7 +181,7 @@ object Dav {
         fun deleteTableObjectImmediatelyAsync(uuid: UUID) : Deferred<Unit?> = deleteTableObjectImmediatelyAsync(uuid, databaseScope)
 
         suspend fun deleteTableObjectImmediately(uuid: UUID) : Unit? = coroutineScope {
-            deleteTableObjectAsync(uuid, this).await()
+            deleteTableObjectImmediatelyAsync(uuid, this).await()
         }
 
         private fun createPropertyAsync(property: Property, scope: CoroutineScope) : Deferred<Long?> = scope.async {
