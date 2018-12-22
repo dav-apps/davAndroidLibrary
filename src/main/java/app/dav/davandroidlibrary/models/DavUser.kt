@@ -1,15 +1,18 @@
 package app.dav.davandroidlibrary.models
 
 import android.util.Log
+import androidx.work.*
 import app.dav.davandroidlibrary.Dav
 import app.dav.davandroidlibrary.common.ProjectInterface
 import app.dav.davandroidlibrary.data.DataManager
+import app.dav.davandroidlibrary.workers.SyncWorker
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
 import java.io.InputStream
+import java.util.concurrent.TimeUnit
 
 private const val avatarFileName = "avatar.png"
 private val avatarFilePath = Dav.dataPath + avatarFileName
@@ -48,6 +51,17 @@ class DavUser() {
                 downloadUserInformation()
                 DataManager.sync().await()
             }
+
+            // Start the sync worker
+            val constraints = Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .setRequiresBatteryNotLow(true)
+                    .build()
+
+            val request: WorkRequest = PeriodicWorkRequestBuilder<SyncWorker>(1, TimeUnit.DAYS)
+                    .setConstraints(constraints)
+                    .build()
+            WorkManager.getInstance().enqueue(request)
         }else{
             isLoggedIn = false
         }
