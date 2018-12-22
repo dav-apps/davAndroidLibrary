@@ -303,6 +303,7 @@ class TableObject{
                 reportProgress?.invoke(-1)
                 Log.d("TableObject", "Error: ${response.body()?.string()}")
             }
+            response.close()
         } catch (e: Exception) {
             reportProgress?.invoke(-1)
             Log.d("TableObject", "There was an error when downloading the file: ${e.message}")
@@ -352,19 +353,23 @@ class TableObject{
                         .build())
                         .execute()
                 val responseBody = response.body()?.string() ?: return@async null
+                val etag: String?
 
                 if(response.isSuccessful){
                     // Convert the result string to TableObjectData
                     val tableObjectData = TableObjectData(responseBody)
-                    tableObjectData.etag
+                    etag = tableObjectData.etag
                 }else{
                     // Check the error
                     if(responseBody.contains("2704")){    // Field already taken: uuid
                         saveUploadStatus(TableObjectUploadStatus.UpToDate)
                     }
 
-                    null
+                    etag = null
                 }
+
+                response.close()
+                etag
             }.await()
         }catch (e: IOException){
             Log.d("TableObject", "Error in createOnServer: ${e.message}")
@@ -412,11 +417,12 @@ class TableObject{
                         .build())
                         .execute()
                 val responseBody = response.body()?.string() ?: return@async null
+                val etag: String?
 
                 if(response.isSuccessful){
                     // Convert the result string to TableObjectData
                     val tableObjectData = TableObjectData(responseBody)
-                    tableObjectData.etag
+                    etag = tableObjectData.etag
                 }else{
                     // Check the error
                     if(responseBody.contains("2805")){  // Resource does not exist: TableObject
@@ -424,8 +430,11 @@ class TableObject{
                         deleteImmediately()
                     }
 
-                    null
+                    etag = null
                 }
+
+                response.close()
+                etag
             }.await()
         }catch (e: IOException){
             Log.d("TableObject", "Error in updateOnServer: ${e.message}")
@@ -450,14 +459,18 @@ class TableObject{
         try {
             return GlobalScope.async {
                 val response = client.newCall(request).execute()
+                val result: Boolean
 
                 if(response.isSuccessful){
-                    true
+                    result = true
                 }else{
                     // Check the error
                     val responseBody = response.body()?.string() ?: return@async false
-                    return@async responseBody.contains("2805") || responseBody.contains("1102")
+                    result = responseBody.contains("2805") || responseBody.contains("1102")
                 }
+
+                response.close()
+                result
             }.await()
         }catch (e: IOException){
             Log.d("TableObject", "Error in deleteOnServer: ${e.message}")
