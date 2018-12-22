@@ -26,6 +26,7 @@ android {
 dependencies {
     def roomVersion = "1.1.1"
     def lifecycleVersion = "1.1.1"
+    def workVersion = "1.0.0-beta01"
 
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
@@ -40,6 +41,9 @@ dependencies {
     kapt 'android.arch.persistence.room:compiler:' + roomVersion
 
     implementation "android.arch.lifecycle:extensions:" + lifecycleVersion
+
+    // WorkManager
+    implementation "android.arch.work:work-runtime-ktx:$workVersion"
 
     // Kotlin Coroutines
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.0.1'
