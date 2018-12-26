@@ -184,13 +184,13 @@ object Dav {
             deleteTableObjectImmediatelyAsync(uuid, this).await()
         }
 
-        private fun createPropertyAsync(property: Property, scope: CoroutineScope) : Deferred<Long?> = scope.async {
-            database?.propertyDao()?.insertProperty(Property.convertPropertyToPropertyEntity(property))
+        private fun createPropertyAsync(property: Property, scope: CoroutineScope) : Deferred<Long> = scope.async {
+            database?.propertyDao()?.insertProperty(Property.convertPropertyToPropertyEntity(property)) ?: 0
         }
 
-        fun createPropertyAsync(property: Property) : Deferred<Long?> = createPropertyAsync(property, databaseScope)
+        fun createPropertyAsync(property: Property) : Deferred<Long> = createPropertyAsync(property, databaseScope)
 
-        suspend fun createProperty(property: Property) : Long? = coroutineScope {
+        suspend fun createProperty(property: Property) : Long = coroutineScope {
             createPropertyAsync(property, this).await()
         }
 

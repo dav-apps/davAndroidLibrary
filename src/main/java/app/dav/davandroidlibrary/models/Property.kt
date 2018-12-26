@@ -43,7 +43,7 @@ class Property{
         // Check if the table object already exists
         if(tableObjectId != 0L){
             if(!Dav.Database.propertyExistsAsync(id).await()){
-                Dav.Database.createProperty(this)
+                id = Dav.Database.createProperty(this)
             }else{
                 Dav.Database.updateProperty(this)
             }
