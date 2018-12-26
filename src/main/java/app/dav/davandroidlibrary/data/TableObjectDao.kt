@@ -17,9 +17,12 @@ interface TableObjectDao {
     @Transaction @Query("SELECT * FROM TableObject WHERE uuid == :uuid;")
     fun getTableObject(uuid: String) : TableObjectEntity
 
-    @Update()
+    @Update
     fun updateTableObject(tableObject: TableObjectEntity)
 
     @Delete
     fun deleteTableObject(tableObject: TableObjectEntity)
+
+    @Transaction @Query("DELETE FROM TableObject;")
+    fun deleteAllTableObjects()
 }
