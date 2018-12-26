@@ -452,4 +452,60 @@ class DavInstrumentedTest{
         Assert.assertNull(secondPropertyFromDatabase)
     }
     // End deleteTableObjectImmediately
+
+    // createProperty tests
+    @Test
+    fun createPropertyShouldSaveThePropertyInTheDatabaseAndReturnThePropertyId(){
+        // Arrange
+        val tableObject = runBlocking {
+            TableObject.create(2)
+        }
+        val property = Property(tableObject.id, "page1", "Hello World")
+
+        // Act
+        val id = runBlocking {
+            Dav.Database.createProperty(property)
+        }
+
+        // Assert
+        Assert.assertNotNull(id)
+        val propertyFromDatabase = database.propertyDao().getProperty(id!!)
+        Assert.assertEquals(property.tableObjectId, propertyFromDatabase.tableObjectId)
+        Assert.assertEquals(property.name, propertyFromDatabase.name)
+        Assert.assertEquals(property.value, propertyFromDatabase.value)
+    }
+    // End createProperty tests
+
+    // getPropertiesOfTableObject tests
+    @Test
+    fun getPropertiesOfTableObjectShouldReturnAllPropertiesOfTheTableObject(){
+        // Arrange
+        val uuid = UUID.randomUUID()
+        val tableId = 8
+        val firstPropertyName = "page1"
+        val secondPropertyName = "page2"
+        val firstPropertyValue = "Hello World"
+        val secondPropertyValue = "Hallo Welt"
+
+        val properties = arrayListOf<Property>(
+                Property(0, firstPropertyName, firstPropertyValue),
+                Property(0, secondPropertyName, secondPropertyValue))
+
+        val tableObject = runBlocking {
+            TableObject.create(uuid, tableId, properties)
+        }
+
+        // Act
+        val propertiesList = runBlocking {
+            Dav.Database.getPropertiesOfTableObject(tableObject.id)
+        }
+
+        // Assert
+        Assert.assertEquals(propertiesList.size, 2)
+        Assert.assertEquals(firstPropertyName, propertiesList[0].name)
+        Assert.assertEquals(firstPropertyValue, propertiesList[0].value)
+        Assert.assertEquals(secondPropertyName, propertiesList[1].name)
+        Assert.assertEquals(secondPropertyValue, propertiesList[1].value)
+    }
+    // End getPropertiesOfTableObject tests
 }
