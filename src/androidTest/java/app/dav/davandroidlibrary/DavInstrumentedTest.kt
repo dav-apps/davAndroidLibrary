@@ -6,6 +6,7 @@ import android.util.Log
 import app.dav.davandroidlibrary.data.DavDatabase
 import app.dav.davandroidlibrary.models.Property
 import app.dav.davandroidlibrary.models.TableObject
+import app.dav.davandroidlibrary.models.TableObjectUploadStatus
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert
 import org.junit.Test
@@ -19,6 +20,9 @@ class DavInstrumentedTest{
 
     init {
         Dav.init(context)
+
+        // Drop the database
+        database.tableObjectDao().deleteAllTableObjects()
     }
 
     // createTableObject tests
@@ -123,4 +127,138 @@ class DavInstrumentedTest{
         Assert.assertNull(tableObject)
     }
     // End getTableObject tests
+
+    // getAllTableObjects(deleted: Boolean) tests
+    @Test
+    fun getAllTableObjectsShouldReturnAllTableObjects(){
+        // Arrange
+        val firstTableObject = runBlocking {
+            TableObject.create(UUID.randomUUID(), 12)
+        }
+        val secondTableObject = runBlocking {
+            TableObject.create(UUID.randomUUID(), 12)
+        }
+        val thirdTableObject = runBlocking {
+            TableObject.create(UUID.randomUUID(), 13)
+        }
+        runBlocking { thirdTableObject.saveUploadStatus(TableObjectUploadStatus.Deleted) }
+
+        // Act
+        val allTableObjects = runBlocking {
+            Dav.Database.getAllTableObjects(true)
+        }
+
+        // Assert
+        Assert.assertEquals(3, allTableObjects.size)
+
+        Assert.assertEquals(firstTableObject.uuid, allTableObjects[0].uuid)
+        Assert.assertEquals(firstTableObject.tableId, allTableObjects[0].tableId)
+
+        Assert.assertEquals(secondTableObject.uuid, allTableObjects[1].uuid)
+        Assert.assertEquals(secondTableObject.tableId, allTableObjects[1].tableId)
+
+        Assert.assertEquals(thirdTableObject.uuid, allTableObjects[2].uuid)
+        Assert.assertEquals(thirdTableObject.tableId, allTableObjects[2].tableId)
+    }
+
+    @Test
+    fun getAllTableObjectsShouldReturnAllTableObjectsExceptDeletedOnes(){
+        // Arrange
+        val firstTableObject = runBlocking {
+            TableObject.create(UUID.randomUUID(), 12)
+        }
+        val secondTableObject = runBlocking {
+            TableObject.create(UUID.randomUUID(), 12)
+        }
+        val thirdTableObject = runBlocking {
+            TableObject.create(UUID.randomUUID(), 13)
+        }
+        runBlocking { thirdTableObject.saveUploadStatus(TableObjectUploadStatus.Deleted) }
+
+        // Act
+        val allTableObjects = runBlocking {
+            Dav.Database.getAllTableObjects(false)
+        }
+
+        // Assert
+        Assert.assertEquals(2, allTableObjects.size)
+
+        Assert.assertEquals(firstTableObject.uuid, allTableObjects[0].uuid)
+        Assert.assertEquals(firstTableObject.tableId, allTableObjects[0].tableId)
+
+        Assert.assertEquals(secondTableObject.uuid, allTableObjects[1].uuid)
+        Assert.assertEquals(secondTableObject.tableId, allTableObjects[1].tableId)
+    }
+    // End getAllTableObjects(deleted: Boolean) tests
+
+    // getAllTableObjects(tableId: Int, deleted: Boolean) tests
+    @Test
+    fun getAllTableObjectsWithTableIdShouldReturnAllTableObjectsOfTheTable(){
+        // Arrange
+        val tableId = 12
+        val firstTableObject = runBlocking {
+            TableObject.create(UUID.randomUUID(), tableId)
+        }
+        val secondTableObject = runBlocking {
+            TableObject.create(UUID.randomUUID(), tableId)
+        }
+        val thirdTableObject = runBlocking {
+            TableObject.create(UUID.randomUUID(), 3)
+        }
+        val fourthTableObject = runBlocking {
+            TableObject.create(UUID.randomUUID(), tableId)
+        }
+        runBlocking { fourthTableObject.saveUploadStatus(TableObjectUploadStatus.Deleted) }
+
+        // Act
+        val allTableObjects = runBlocking {
+            Dav.Database.getAllTableObjects(tableId, true)
+        }
+
+        // Assert
+        Assert.assertEquals(3, allTableObjects.size)
+
+        Assert.assertEquals(firstTableObject.uuid, allTableObjects[0].uuid)
+        Assert.assertEquals(firstTableObject.tableId, allTableObjects[0].tableId)
+
+        Assert.assertEquals(secondTableObject.uuid, allTableObjects[1].uuid)
+        Assert.assertEquals(secondTableObject.tableId, allTableObjects[1].tableId)
+
+        Assert.assertEquals(fourthTableObject.uuid, allTableObjects[2].uuid)
+        Assert.assertEquals(fourthTableObject.tableId, allTableObjects[2].tableId)
+    }
+
+    @Test
+    fun getAllTableObjectsWithTableIdShouldReturnAlltableObjectsOfTheTableExceptDeletedOnes(){
+        // Arrange
+        val tableId = 12
+        val firstTableObject = runBlocking {
+            TableObject.create(UUID.randomUUID(), tableId)
+        }
+        val secondTableObject = runBlocking {
+            TableObject.create(UUID.randomUUID(), tableId)
+        }
+        val thirdTableObject = runBlocking {
+            TableObject.create(UUID.randomUUID(), 3)
+        }
+        val fourthTableObject = runBlocking {
+            TableObject.create(UUID.randomUUID(), tableId)
+        }
+        runBlocking { fourthTableObject.saveUploadStatus(TableObjectUploadStatus.Deleted) }
+
+        // Act
+        val allTableObjects = runBlocking {
+            Dav.Database.getAllTableObjects(tableId, false)
+        }
+
+        // Assert
+        Assert.assertEquals(2, allTableObjects.size)
+
+        Assert.assertEquals(firstTableObject.uuid, allTableObjects[0].uuid)
+        Assert.assertEquals(firstTableObject.tableId, allTableObjects[0].tableId)
+
+        Assert.assertEquals(secondTableObject.uuid, allTableObjects[1].uuid)
+        Assert.assertEquals(secondTableObject.tableId, allTableObjects[1].tableId)
+    }
+    // End getAllTableObjects(tableId: Int, deleted: Boolean) tests
 }
