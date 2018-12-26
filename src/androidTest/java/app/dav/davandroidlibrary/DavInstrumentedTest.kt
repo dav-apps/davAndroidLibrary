@@ -406,4 +406,50 @@ class DavInstrumentedTest{
         Assert.assertNull(secondPropertyFromDatabase)
     }
     // End deleteTableObject tests
+
+    // deleteTableObjectImmediately tests
+    @Test
+    fun deleteTableObjectImmediatelyShouldDeleteTheTableObjectAndItsPropertiesImmediately(){
+        // Arrange
+        val uuid = UUID.randomUUID()
+        val tableId = 6
+        val firstPropertyName = "page1"
+        val secondPropertyName = "page2"
+        val firstPropertyValue = "Hello World"
+        val secondPropertyValue = "Hallo Welt"
+
+        val properties = arrayListOf<Property>(
+                Property(0, firstPropertyName, firstPropertyValue),
+                Property(0, secondPropertyName, secondPropertyValue))
+
+        val tableObject = runBlocking {
+            TableObject.create(uuid, tableId, properties)
+        }
+        val firstPropertyId = tableObject.properties[0].id
+        val secondPropertyId = tableObject.properties[1].id
+
+        // Check if the table object and the properties were created
+        var tableObjectFromDatabase = database.tableObjectDao().getTableObject(tableObject.id)
+        Assert.assertNotNull(tableObjectFromDatabase)
+
+        var firstPropertyFromDatabase = database.propertyDao().getProperty(firstPropertyId)
+        Assert.assertNotNull(firstPropertyFromDatabase)
+
+        var secondPropertyFromDatabase = database.propertyDao().getProperty(secondPropertyId)
+        Assert.assertNotNull(secondPropertyFromDatabase)
+
+        // Act
+        runBlocking { Dav.Database.deleteTableObjectImmediately(uuid) }
+
+        // Assert
+        tableObjectFromDatabase = database.tableObjectDao().getTableObject(tableObject.id)
+        Assert.assertNull(tableObjectFromDatabase)
+
+        firstPropertyFromDatabase = database.propertyDao().getProperty(firstPropertyId)
+        Assert.assertNull(firstPropertyFromDatabase)
+
+        secondPropertyFromDatabase = database.propertyDao().getProperty(secondPropertyId)
+        Assert.assertNull(secondPropertyFromDatabase)
+    }
+    // End deleteTableObjectImmediately
 }
