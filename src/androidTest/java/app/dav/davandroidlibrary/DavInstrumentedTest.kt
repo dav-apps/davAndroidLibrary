@@ -340,4 +340,70 @@ class DavInstrumentedTest{
         Assert.assertFalse(tableObjectExists)
     }
     // End tableObjectExists tests
+
+    // deleteTableObject tests
+    @Test
+    fun deleteTableObjectShouldSetTheUploadStatusToDeleted(){
+        // Arrange
+        val uuid = UUID.randomUUID()
+        val tableId = 2
+        val tableObject = runBlocking {
+            TableObject.create(uuid, tableId)
+        }
+
+        // Act
+        runBlocking {
+            Dav.Database.deleteTableObject(uuid)
+        }
+
+        // Assert
+        val tableObjectFromDatabase = database.tableObjectDao().getTableObject(tableObject.id)
+        Assert.assertEquals(TableObjectUploadStatus.Deleted.uploadStatus, tableObjectFromDatabase.uploadStatus)
+    }
+
+    @Test
+    fun deleteTableObjectShouldDeleteTheTableObjectAndItsPropertiesIfTheUploadStatusIsDeleted(){
+        // Arrange
+        val uuid = UUID.randomUUID()
+        val tableId = 4
+        val firstPropertyName = "page1"
+        val secondPropertyName = "page2"
+        val firstPropertyValue = "Hello World"
+        val secondPropertyValue = "Hallo Welt"
+
+        val properties = arrayListOf<Property>(
+                Property(0, firstPropertyName, firstPropertyValue),
+                Property(0, secondPropertyName, secondPropertyValue))
+
+        val tableObject = runBlocking {
+            TableObject.create(uuid, tableId, properties)
+        }
+        val firstPropertyId = tableObject.properties[0].id
+        val secondPropertyId = tableObject.properties[1].id
+        runBlocking { tableObject.saveUploadStatus(TableObjectUploadStatus.Deleted) }
+
+        // Check if the table object and the properties were created
+        var tableObjectFromDatabase = database.tableObjectDao().getTableObject(tableObject.id)
+        Assert.assertNotNull(tableObjectFromDatabase)
+
+        var firstPropertyFromDatabase = database.propertyDao().getProperty(firstPropertyId)
+        Assert.assertNotNull(firstPropertyFromDatabase)
+
+        var secondPropertyFromDatabase = database.propertyDao().getProperty(secondPropertyId)
+        Assert.assertNotNull(secondPropertyFromDatabase)
+
+        // Act
+        runBlocking { Dav.Database.deleteTableObject(uuid) }
+
+        // Assert
+        tableObjectFromDatabase = database.tableObjectDao().getTableObject(tableObject.id)
+        Assert.assertNull(tableObjectFromDatabase)
+
+        firstPropertyFromDatabase = database.propertyDao().getProperty(firstPropertyId)
+        Assert.assertNull(firstPropertyFromDatabase)
+
+        secondPropertyFromDatabase = database.propertyDao().getProperty(secondPropertyId)
+        Assert.assertNull(secondPropertyFromDatabase)
+    }
+    // End deleteTableObject tests
 }
