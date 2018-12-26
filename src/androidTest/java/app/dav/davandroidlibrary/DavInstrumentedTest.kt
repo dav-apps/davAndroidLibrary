@@ -307,4 +307,37 @@ class DavInstrumentedTest{
         runBlocking { Dav.Database.updateTableObject(tableObject) }
     }
     // End updateTableObject tests
+
+    // tableObjectExists tests
+    @Test
+    fun tableObjectExistsShouldReturnTrueIfTheTableObjectExists(){
+        // Arrange
+        val uuid = UUID.randomUUID()
+        val tableObject = runBlocking {
+            TableObject.create(uuid, 1)
+        }
+
+        // Act
+        val tableObjectExists = runBlocking {
+            Dav.Database.tableObjectExists(uuid)
+        }
+
+        // Assert
+        Assert.assertTrue(tableObjectExists)
+    }
+
+    @Test
+    fun tableObjectExistsShouldReturnFalseIfTheTableObjectDoesNotExist(){
+        // Arrange
+        val uuid = UUID.randomUUID()
+
+        // Act
+        val tableObjectExists = runBlocking {
+            Dav.Database.tableObjectExists(uuid)
+        }
+
+        // Assert
+        Assert.assertFalse(tableObjectExists)
+    }
+    // End tableObjectExists tests
 }
