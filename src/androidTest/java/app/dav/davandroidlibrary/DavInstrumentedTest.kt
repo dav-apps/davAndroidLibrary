@@ -2,7 +2,6 @@ package app.dav.davandroidlibrary
 
 import android.support.test.InstrumentationRegistry
 import android.support.test.runner.AndroidJUnit4
-import android.util.Log
 import app.dav.davandroidlibrary.data.DavDatabase
 import app.dav.davandroidlibrary.models.*
 import kotlinx.coroutines.runBlocking
@@ -547,4 +546,36 @@ class DavInstrumentedTest{
         runBlocking { Dav.Database.updateProperty(property) }
     }
     // End updateProperty tests
+
+    // propertyExists tests
+    @Test
+    fun propertyExistsShouldReturnTrueIfThePropertyExists(){
+        // Arrange
+        val tableObject = runBlocking {
+            TableObject.create(5)
+        }
+        val property = runBlocking {
+            Property.create(tableObject.id, "page1", "Hello World")
+        }
+
+        // Act
+        val propertyExists = runBlocking {
+            Dav.Database.propertyExists(property.id)
+        }
+
+        // Assert
+        Assert.assertTrue(propertyExists)
+    }
+
+    @Test
+    fun propertyExistsShouldReturnFalseIfThePropertyDoesNotExist(){
+        // Act
+        val propertyExists = runBlocking {
+            Dav.Database.propertyExists(8)
+        }
+
+        // Assert
+        Assert.assertFalse(propertyExists)
+    }
+    // End propertyExists tests
 }
