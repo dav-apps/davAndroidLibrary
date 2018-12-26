@@ -6,6 +6,7 @@ import android.util.Log
 import app.dav.davandroidlibrary.data.DavDatabase
 import app.dav.davandroidlibrary.models.Property
 import app.dav.davandroidlibrary.models.TableObject
+import app.dav.davandroidlibrary.models.TableObjectEntity
 import app.dav.davandroidlibrary.models.TableObjectUploadStatus
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert
@@ -261,4 +262,49 @@ class DavInstrumentedTest{
         Assert.assertEquals(secondTableObject.tableId, allTableObjects[1].tableId)
     }
     // End getAllTableObjects(tableId: Int, deleted: Boolean) tests
+
+    // updateTableObject tests
+    @Test
+    fun updateTableObjectShouldUpdateTheTableObjectInTheDatabase(){
+        // Arrange
+        val uuid = UUID.randomUUID()
+        val tableId = 5
+        val oldVisibilityInt = 1
+        val newVisibilityInt = 2
+        val oldUploadStatusInt = 0
+        val newUploadStatusInt = 1
+        val oldEtag = "oldetag"
+        val newEtag = "newetag"
+
+        val oldTableObjectEntity = TableObjectEntity(tableId, uuid.toString(), oldVisibilityInt, oldUploadStatusInt, false, oldEtag)
+        oldTableObjectEntity.id = database.tableObjectDao().insertTableObject(oldTableObjectEntity)
+
+        // Create a second table object with the same id and uuid but different values, and replace the old table object with this one
+        val newTableObjectEntity = TableObjectEntity(tableId, uuid.toString(), newVisibilityInt, newUploadStatusInt, false, newEtag)
+        newTableObjectEntity.id = oldTableObjectEntity.id
+        val newTableObject = TableObject.convertTableObjectEntityToTableObject(newTableObjectEntity)
+
+        // Act
+        runBlocking { Dav.Database.updateTableObject(newTableObject) }
+
+        // Assert
+        val tableObjectFromDatabase = database.tableObjectDao().getTableObject(newTableObject.id)
+        Assert.assertEquals(newTableObject.id, tableObjectFromDatabase.id)
+        Assert.assertEquals(tableId, tableObjectFromDatabase.tableId)
+        Assert.assertEquals(newVisibilityInt, tableObjectFromDatabase.visibility)
+        Assert.assertEquals(newUploadStatusInt, tableObjectFromDatabase.uploadStatus)
+        Assert.assertEquals(newEtag, tableObjectFromDatabase.etag)
+    }
+
+    @Test
+    fun updateTableObjectShouldNotThrowAnExceptionWhenTheTableObjectDoesNotExist(){
+        // Arrange
+        val tableObjectEntity = TableObjectEntity(-2, UUID.randomUUID().toString(), 0, 0, false, "")
+        tableObjectEntity.id = -3
+        val tableObject = TableObject.convertTableObjectEntityToTableObject(tableObjectEntity)
+
+        // Act
+        runBlocking { Dav.Database.updateTableObject(tableObject) }
+    }
+    // End updateTableObject tests
 }
