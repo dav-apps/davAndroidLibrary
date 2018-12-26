@@ -4,10 +4,7 @@ import android.support.test.InstrumentationRegistry
 import android.support.test.runner.AndroidJUnit4
 import android.util.Log
 import app.dav.davandroidlibrary.data.DavDatabase
-import app.dav.davandroidlibrary.models.Property
-import app.dav.davandroidlibrary.models.TableObject
-import app.dav.davandroidlibrary.models.TableObjectEntity
-import app.dav.davandroidlibrary.models.TableObjectUploadStatus
+import app.dav.davandroidlibrary.models.*
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert
 import org.junit.Test
@@ -279,7 +276,7 @@ class DavInstrumentedTest{
         val oldTableObjectEntity = TableObjectEntity(tableId, uuid.toString(), oldVisibilityInt, oldUploadStatusInt, false, oldEtag)
         oldTableObjectEntity.id = database.tableObjectDao().insertTableObject(oldTableObjectEntity)
 
-        // Create a second table object with the same id and uuid but different values, and replace the old table object with this one
+        // Create a second table object with the same id and uuid but different values and replace the old table object with this one
         val newTableObjectEntity = TableObjectEntity(tableId, uuid.toString(), newVisibilityInt, newUploadStatusInt, false, newEtag)
         newTableObjectEntity.id = oldTableObjectEntity.id
         val newTableObject = TableObject.convertTableObjectEntityToTableObject(newTableObjectEntity)
@@ -508,4 +505,46 @@ class DavInstrumentedTest{
         Assert.assertEquals(secondPropertyValue, propertiesList[1].value)
     }
     // End getPropertiesOfTableObject tests
+
+    // updateProperty tests
+    @Test
+    fun updatePropertyShouldUpdateThePropertyInTheDatabase(){
+        // Arrange
+        val oldPropertyName = "page1"
+        val newPropertyName = "page2"
+        val oldPropertyValue = "Hello World"
+        val newPropertyValue = "Hallo Welt"
+        val tableObject = runBlocking {
+            TableObject.create(5)
+        }
+
+        val oldPropertyEntity = PropertyEntity(tableObject.id, oldPropertyName, oldPropertyValue)
+        oldPropertyEntity.id = database.propertyDao().insertProperty(oldPropertyEntity)
+
+        // Create a second property with the same id but different values and replace the old property with this one
+        val newPropertyEntity = PropertyEntity(tableObject.id, newPropertyName, newPropertyValue)
+        newPropertyEntity.id = oldPropertyEntity.id
+        val newProperty = Property.convertPropertyEntityToProperty(newPropertyEntity)
+
+        // Act
+        runBlocking { Dav.Database.updateProperty(newProperty) }
+
+        // Assert
+        val propertyFromDatabase = database.propertyDao().getProperty(newProperty.id)
+        Assert.assertEquals(newProperty.id, propertyFromDatabase.id)
+        Assert.assertEquals(tableObject.id, propertyFromDatabase.tableObjectId)
+        Assert.assertEquals(newPropertyName, propertyFromDatabase.name)
+        Assert.assertEquals(newPropertyValue, propertyFromDatabase.value)
+    }
+
+    @Test
+    fun updatePropertyShouldNotThrowAnExceptionWhenThePropertyDoesNotExist(){
+        // Arrange
+        val property = Property(-3, "page1", "Hello World")
+        property.id = 92
+
+        // Act
+        runBlocking { Dav.Database.updateProperty(property) }
+    }
+    // End updateProperty tests
 }
