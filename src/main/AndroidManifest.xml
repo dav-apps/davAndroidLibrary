@@ -1,2 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="app.dav.davandroidlibrary" />
+    package="app.dav.davandroidlibrary">
+
+    <uses-permission-sdk-23 android:name="android.permission.INTERNET" />
+</manifest>

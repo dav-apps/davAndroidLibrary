@@ -6,6 +6,7 @@ import app.dav.davandroidlibrary.Constants
 import app.dav.davandroidlibrary.Dav
 import app.dav.davandroidlibrary.common.*
 import app.dav.davandroidlibrary.data.DavDatabase
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -53,4 +54,37 @@ class DavUserInstrumentedTest {
         Assert.assertEquals(Constants.jwt, user.jwt)
     }
     // End constructor tests
+
+    // Login tests
+    @Test
+    fun loginWithValidJwtShouldLogTheUserInAndDownloadTheUserInformation(){
+        // Arrange
+        ProjectInterface.localDataSettings?.setStringValue(Dav.jwtKey, "")
+        val user = DavUser()
+
+        // Act
+        runBlocking { user.login(Constants.jwt) }
+
+        // Assert
+        Assert.assertTrue(user.isLoggedIn)
+        Assert.assertEquals(Constants.jwt, user.jwt)
+        Assert.assertEquals(Constants.testuserEmail, user.email)
+        Assert.assertEquals(Constants.testuserUsername, user.username)
+        Assert.assertEquals(Constants.testuserPlan, user.plan)
+    }
+
+    @Test
+    fun loginWithInvalidJwtShouldNotLogTheUserIn(){
+        // Arrange
+        ProjectInterface.localDataSettings?.setStringValue(Dav.jwtKey, "")
+        val user = DavUser()
+
+        // Act
+        runBlocking { user.login("blablabla") }
+
+        // Assert
+        Assert.assertFalse(user.isLoggedIn)
+        Assert.assertTrue(user.jwt.isEmpty())
+    }
+    // End login tests
 }
