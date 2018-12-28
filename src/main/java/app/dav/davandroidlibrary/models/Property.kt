@@ -50,6 +50,12 @@ class Property{
         }
     }
 
+    fun toPropertyEntity() : PropertyEntity{
+        val propertyEntity = PropertyEntity(tableObjectId, name, value)
+        propertyEntity.id = if(id == 0L) null else id
+        return propertyEntity
+    }
+
     companion object {
         suspend fun create(tableObjectId: Long, name: String, value: String) : Property{
             val property = Property(tableObjectId, name, value)
@@ -64,15 +70,6 @@ class Property{
             property.name = propertyEntity.name
             property.value = propertyEntity.value
             return property
-        }
-
-        fun convertPropertyToPropertyEntity(property: Property) : PropertyEntity {
-            val propertyEntity = PropertyEntity(property.tableObjectId,
-                    property.name,
-                    property.value)
-
-            propertyEntity.id = if(property.id == 0L) null else property.id
-            return propertyEntity
         }
     }
 }

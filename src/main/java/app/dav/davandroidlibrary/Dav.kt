@@ -15,7 +15,7 @@ import kotlin.collections.ArrayList
 
 object Dav {
     private const val apiBaseUrlProduction = "https://dav-backend.herokuapp.com/v1/"
-    private const val apiBaseUrlDevelopment = "https://adc068d5.ngrok.io/v1/"
+    private const val apiBaseUrlDevelopment = "https://c1fbd7f8.ngrok.io/v1/"
 
     const val databaseName = "dav.db"
     var database: DavDatabase? = null
@@ -62,7 +62,7 @@ object Dav {
             if(!id.equals(0)){
                 for(property in tableObject.properties){
                     property.tableObjectId = id
-                    property.id = database?.propertyDao()?.insertProperty(Property.convertPropertyToPropertyEntity(property)) ?: 0
+                    property.id = database?.propertyDao()?.insertProperty(property.toPropertyEntity()) ?: 0
                 }
             }
             id
@@ -185,7 +185,7 @@ object Dav {
         }
 
         private fun createPropertyAsync(property: Property, scope: CoroutineScope) : Deferred<Long> = scope.async {
-            database?.propertyDao()?.insertProperty(Property.convertPropertyToPropertyEntity(property)) ?: 0
+            database?.propertyDao()?.insertProperty(property.toPropertyEntity()) ?: 0
         }
 
         fun createPropertyAsync(property: Property) : Deferred<Long> = createPropertyAsync(property, databaseScope)
@@ -214,7 +214,7 @@ object Dav {
         }
 
         private fun updatePropertyAsync(property: Property, scope: CoroutineScope) : Deferred<Unit?> = scope.async {
-            database?.propertyDao()?.updateProperty(Property.convertPropertyToPropertyEntity(property))
+            database?.propertyDao()?.updateProperty(property.toPropertyEntity())
         }
 
         fun updatePropertyAsync(property: Property) : Deferred<Unit?> = updatePropertyAsync(property, databaseScope)
