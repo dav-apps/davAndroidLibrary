@@ -53,6 +53,28 @@ class PropertyInstrumentedTest {
     }
     // End setPropertyValue tests
 
+    // toPropertyEntity tests
+    @Test
+    fun toPropertyEntityShouldReturnValidPropertyEntityObject(){
+        // Arrange
+        val tableObject = runBlocking { TableObject.create(32) }
+        val propertyName = "test"
+        val propertyValue = "blabla"
+        val property = runBlocking {
+            Property.create(tableObject.id, propertyName, propertyValue)
+        }
+
+        // Act
+        val propertyEntity = property.toPropertyEntity()
+
+        // Assert
+        Assert.assertEquals(property.id, propertyEntity.id)
+        Assert.assertEquals(tableObject.id, propertyEntity.tableObjectId)
+        Assert.assertEquals(propertyName, propertyEntity.name)
+        Assert.assertEquals(propertyValue, propertyEntity.value)
+    }
+    // End toPropertyEntity tests
+
     // create tests
     @Test
     fun createShouldCreateANewPropertyAndSaveItInTheDatabase(){
