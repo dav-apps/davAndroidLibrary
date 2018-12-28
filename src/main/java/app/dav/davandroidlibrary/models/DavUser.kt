@@ -115,7 +115,7 @@ class DavUser() {
 
             if(avatarEtag != newAvatarEtag || !avatarFile.exists()){
                 // Download the avatar
-                GlobalScope.launch { downloadAvatar(avatarUrl) }
+                downloadAvatar(avatarUrl)
             }
 
             if(avatarFile.exists()){
@@ -158,7 +158,7 @@ class DavUser() {
     }
 
     companion object {
-        private fun convertIntToDavPlan(plan: Int) : DavPlan{
+        internal fun convertIntToDavPlan(plan: Int) : DavPlan{
             return when(plan){
                 1 -> DavPlan.Plus
                 else -> DavPlan.Free

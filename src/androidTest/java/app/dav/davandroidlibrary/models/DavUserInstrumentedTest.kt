@@ -71,6 +71,9 @@ class DavUserInstrumentedTest {
         Assert.assertEquals(Constants.testuserEmail, user.email)
         Assert.assertEquals(Constants.testuserUsername, user.username)
         Assert.assertEquals(Constants.testuserPlan, user.plan)
+
+        // Check if the avatar was downloaded
+        Assert.assertTrue(user.avatar.exists())
     }
 
     @Test
@@ -87,4 +90,50 @@ class DavUserInstrumentedTest {
         Assert.assertTrue(user.jwt.isEmpty())
     }
     // End login tests
+
+    // Logout tests
+    @Test
+    fun logoutShouldRemoveAllUserDataAndDeleteTheAvatar(){
+        // Arrange
+        val user = DavUser()
+        runBlocking { user.login(Constants.jwt) }
+        Assert.assertTrue(user.isLoggedIn)
+
+        // Act
+        user.logout()
+
+        // Assert
+        Assert.assertFalse(user.isLoggedIn)
+        Assert.assertTrue(user.email.isEmpty())
+        Assert.assertTrue(user.username.isEmpty())
+        Assert.assertTrue(user.jwt.isEmpty())
+        Assert.assertFalse(user.avatar.exists())
+    }
+    // End logout tests
+
+    // convertIntToDavPlan tests
+    @Test
+    fun convertIntToDavPlanShouldConvert0ToFree(){
+        // Arrange
+        val planInt = 0
+
+        // Act
+        val plan = DavUser.convertIntToDavPlan(planInt)
+
+        // Assert
+        Assert.assertEquals(DavPlan.Free, plan)
+    }
+
+    @Test
+    fun convertIntToDavPlanShouldConvert1ToPlus(){
+        // Arrange
+        val planInt = 1
+
+        // Act
+        val plan = DavUser.convertIntToDavPlan(planInt)
+
+        // Assert
+        Assert.assertEquals(DavPlan.Plus, plan)
+    }
+    // End convertIntToDavPlan tests
 }
