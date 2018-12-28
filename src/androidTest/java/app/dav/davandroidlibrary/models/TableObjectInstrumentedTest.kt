@@ -87,4 +87,39 @@ class TableObjectInstrumentedTest {
         Assert.assertEquals(newPropertyValue, tableObject2.properties[0].value)
     }
     // End setPropertyValue tests
+
+    // getPropertyValue tests
+    @Test
+    fun getPropertyValueShouldReturnTheValueOfTheProperty(){
+        // Arrange
+        val uuid = UUID.randomUUID()
+        val tableId = 7
+        val propertyName = "test"
+        val propertyValue = "bla"
+        val properties = arrayListOf<Property>(Property(0, propertyName, propertyValue))
+        val tableObject = runBlocking { TableObject.create(uuid, tableId, properties) }
+
+        Assert.assertEquals(1, tableObject.properties.size)
+        Assert.assertEquals(propertyName, tableObject.properties[0].name)
+        Assert.assertEquals(propertyValue, tableObject.properties[0].value)
+
+        // Act
+        val tableObjectPropertyValue = tableObject.getPropertyValue(propertyName)
+
+        // Assert
+        Assert.assertEquals(propertyValue, tableObjectPropertyValue)
+    }
+
+    @Test
+    fun getPropertyValueShouldReturnNullIfThePropertyDoesNotExist(){
+        // Arrange
+        val tableObject = runBlocking { TableObject.create(1) }
+
+        // Act
+        val propertyValue = tableObject.getPropertyValue("bla")
+
+        // Assert
+        Assert.assertNull(propertyValue)
+    }
+    // End getPropertyValue tests
 }
