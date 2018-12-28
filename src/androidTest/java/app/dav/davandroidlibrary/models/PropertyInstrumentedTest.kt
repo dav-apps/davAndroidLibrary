@@ -52,4 +52,48 @@ class PropertyInstrumentedTest {
         Assert.assertEquals(tableObject.id, propertyFromDatabase.tableObjectId)
     }
     // End setPropertyValue tests
+
+    // create tests
+    @Test
+    fun createShouldCreateANewPropertyAndSaveItInTheDatabase(){
+        // Arrange
+        val tableObject = runBlocking { TableObject.create(4) }
+        val propertyName = "test"
+        val propertyValue = "blabla"
+
+        // Act
+        val property = runBlocking {
+            Property.create(tableObject.id, propertyName, propertyValue)
+        }
+
+        // Assert
+        Assert.assertEquals(tableObject.id, property.tableObjectId)
+        Assert.assertEquals(propertyName, property.name)
+        Assert.assertEquals(propertyValue, property.value)
+
+        val propertyFromDatabase = database.propertyDao().getProperty(property.id)
+        Assert.assertEquals(tableObject.id, propertyFromDatabase.tableObjectId)
+        Assert.assertEquals(propertyName, propertyFromDatabase.name)
+        Assert.assertEquals(propertyValue, propertyFromDatabase.value)
+    }
+    // End create tests
+
+    // convertPropertyEntityToProperty tests
+    @Test
+    fun convertPropertyEntityToPropertyShouldReturnAValidProperty(){
+        // Arrange
+        val tableObjectId = 23L
+        val propertyName = "test"
+        val propertyValue = "blabla"
+        val propertyEntity = PropertyEntity(tableObjectId, propertyName, propertyValue)
+
+        // Act
+        val property = Property.convertPropertyEntityToProperty(propertyEntity)
+
+        // Assert
+        Assert.assertEquals(tableObjectId, property.tableObjectId)
+        Assert.assertEquals(propertyName, property.name)
+        Assert.assertEquals(propertyValue, property.value)
+    }
+    // End convertPropertyEntityToProperty tests
 }
