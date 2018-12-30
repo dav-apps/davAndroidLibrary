@@ -25,6 +25,9 @@ class TableObjectInstrumentedTest {
         // Drop the database
         database.tableObjectDao().deleteAllTableObjects()
 
+        // Delete all files
+        File(Constants.davDataPath).deleteRecursively()
+
         ProjectInterface.localDataSettings = LocalDataSettings()
         ProjectInterface.retrieveConstants = RetrieveConstants()
         ProjectInterface.triggerAction = TriggerAction()
@@ -338,6 +341,92 @@ class TableObjectInstrumentedTest {
         Assert.assertEquals(tableObject.uuid, UUID.fromString(tableObjectFromDatabase.uuid))
     }
     // End create(tableId: Int) tests
+
+    // create(uuid: UUID, tableId: Int) tests
+    @Test
+    fun createWithUuidAndTableIdShouldCreateNewTableObject(){
+        // Arrange
+        val tableId = 8
+        val uuid = UUID.randomUUID()
+
+        // Act
+        val tableObject = runBlocking { TableObject.create(uuid, tableId) }
+
+        // Arrange
+        Assert.assertEquals(tableId, tableObject.tableId)
+        Assert.assertEquals(uuid, tableObject.uuid)
+
+        val tableObjectFromDatabase = database.tableObjectDao().getTableObject(tableObject.id)
+        Assert.assertNotNull(tableObjectFromDatabase)
+        Assert.assertEquals(tableObject.id, tableObjectFromDatabase.id)
+        Assert.assertEquals(tableId, tableObjectFromDatabase.tableId)
+        Assert.assertEquals(uuid, UUID.fromString(tableObjectFromDatabase.uuid))
+    }
+    // End create(uuid: UUID, tableId: Int) tests
+
+    // create(uuid: UUID, tableId: Int, file: File) tests
+    @Test
+    fun createWithUuidTableIdAndFileShouldCreateNewTableObject(){
+        // Arrange
+        val tableId = 9
+        val uuid = UUID.randomUUID()
+        val fileExt = ".ico"
+
+        // Copy the file into the cache
+        val assetManager = InstrumentationRegistry.getContext().assets
+        val inputStream = assetManager.open("files/test/icon.ico")
+        val file = File.createTempFile("icon", fileExt)
+        file.copyInputStreamToFile(inputStream)
+        inputStream.close()
+
+        // Act
+        val tableObject = runBlocking {
+            TableObject.create(uuid, tableId, file)
+        }
+
+        // Assert
+        Assert.assertEquals(tableId, tableObject.tableId)
+        Assert.assertEquals(uuid, tableObject.uuid)
+        Assert.assertTrue(tableObject.isFile)
+        Assert.assertTrue(tableObject.file?.exists() ?: false)
+
+        val tableObjectFromDatabase = runBlocking { Dav.Database.getTableObject(uuid) }
+        Assert.assertNotNull(tableObjectFromDatabase)
+        Assert.assertEquals(tableObject.id, tableObjectFromDatabase!!.id)
+        Assert.assertEquals(tableId, tableObjectFromDatabase.tableId)
+        Assert.assertEquals(uuid, tableObjectFromDatabase.uuid)
+        Assert.assertTrue(tableObjectFromDatabase.isFile)
+        Assert.assertTrue(tableObjectFromDatabase.file?.exists() ?: false)
+        Assert.assertEquals(tableObject.getPropertyValue("ext"), fileExt.replace(".", ""))
+    }
+    // End create(uuid: UUID, tableId: Int, file: File) tests
+
+    // create(uuid: UUID, tableId: Int, properties: ArrayList<Property>) tests
+    @Test
+    fun createWithUuidTableIdAndPropertiesShouldCreateNewTableObject(){
+        // Arrange
+        val tableId = 7
+        val uuid = UUID.randomUUID()
+        val properties = arrayListOf<Property>(
+                Property(0, "page1", "Hello World"),
+                Property(0, "page2", "Hallo Welt")
+        )
+
+        // Act
+        val tableObject = runBlocking { TableObject.create(uuid, tableId, properties) }
+
+        // Assert
+        Assert.assertEquals(tableId, tableObject.tableId)
+        Assert.assertEquals(uuid, tableObject.uuid)
+        Assert.assertEquals(properties, tableObject.properties)
+
+        val tableObjectFromDatabase = runBlocking { Dav.Database.getTableObject(uuid) }
+        Assert.assertNotNull(tableObjectFromDatabase)
+        Assert.assertEquals(tableObject.id, tableObjectFromDatabase!!.id)
+        Assert.assertEquals(tableId, tableObjectFromDatabase.tableId)
+        Assert.assertEquals(uuid, tableObjectFromDatabase.uuid)
+    }
+    // End create(uuid: UUID, tableId: Int, properties: ArrayList<Property>) tests
 
     private fun File.copyInputStreamToFile(inputStream: InputStream) {
         // Return the progress as int between 0 and 100
