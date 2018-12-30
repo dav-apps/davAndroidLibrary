@@ -24,7 +24,7 @@ private val syncScope = CoroutineScope(Dispatchers.Default + syncJob)
 
 class DataManager{
     companion object {
-        private var isSyncing = false
+        internal var isSyncing = false
         private var syncAgain = false
         // The list with the files that will be downloaded asap
         internal val fileDownloadQueue = ArrayList<TableObject>()
@@ -33,7 +33,7 @@ class DataManager{
         private val downloadHandler = Handler(Looper.getMainLooper())
         private val downloadRunnable = Runnable { GlobalScope.launch { downloadFilesTimerElapsed() } }
 
-        fun httpGet(jwt: String, url: String) : Deferred<HttpResultEntry>  = GlobalScope.async {
+        internal fun httpGet(jwt: String, url: String) : Deferred<HttpResultEntry>  = GlobalScope.async {
             val noInternetEntry = HttpResultEntry(false, "No internet connection")
             val isNetworkAvailable = ProjectInterface.generalMethods?.isNetworkAvailable() ?: return@async noInternetEntry
             if(!isNetworkAvailable) return@async noInternetEntry
