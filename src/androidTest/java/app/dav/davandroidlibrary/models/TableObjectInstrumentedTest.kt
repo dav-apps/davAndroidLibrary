@@ -166,7 +166,6 @@ class TableObjectInstrumentedTest {
         val tableObject = runBlocking {
             TableObject.create(uuid, tableId, file)
         }
-
         Assert.assertTrue(tableObject.file?.exists() ?: false)
 
         // Act
@@ -228,7 +227,6 @@ class TableObjectInstrumentedTest {
         val tableObject = runBlocking {
             TableObject.create(uuid, tableId, file)
         }
-
         Assert.assertTrue(tableObject.file?.exists() ?: false)
 
         // Act
@@ -240,6 +238,64 @@ class TableObjectInstrumentedTest {
         Assert.assertNull(tableObjectFromDatabase)
     }
     // End delete tests
+
+    // deleteImmediately tests
+    @Test
+    fun deleteImmediatelyShouldDeleteTheTableObjectImmediately(){
+        // Arrange
+        val tableId = 5
+        val uuid = UUID.randomUUID()
+        val properties = arrayListOf<Property>(
+                Property(0, "page1", "Hello World"),
+                Property(0, "page2", "Hallo Welt"))
+        val tableObject = runBlocking {
+            TableObject.create(uuid, tableId, properties)
+        }
+
+        val firstPropertyId = tableObject.properties[0].id
+        val secondPropertyId = tableObject.properties[1].id
+
+        // Act
+        runBlocking { tableObject.deleteImmediately() }
+
+        // Assert
+        val tableObjectFromDatabase = runBlocking { Dav.Database.getTableObject(uuid) }
+        Assert.assertNull(tableObjectFromDatabase)
+
+        val firstPropertyFromDatabase = database.propertyDao().getProperty(firstPropertyId)
+        Assert.assertNull(firstPropertyFromDatabase)
+
+        val secondPropertyFromDatabase = database.propertyDao().getProperty(secondPropertyId)
+        Assert.assertNull(secondPropertyFromDatabase)
+    }
+
+    @Test
+    fun deleteImmediatelyShouldDeleteTheTableObjectAndItsFile(){
+        // Arrange
+        val tableId = 6
+        val uuid = UUID.randomUUID()
+
+        // Copy the file into the cache
+        val assetManager = InstrumentationRegistry.getContext().assets
+        val inputStream = assetManager.open("files/test/icon.ico")
+        val file = File.createTempFile("icon", ".ico")
+        file.copyInputStreamToFile(inputStream)
+        inputStream.close()
+
+        val tableObject = runBlocking {
+            TableObject.create(uuid, tableId, file)
+        }
+        Assert.assertTrue(tableObject.file?.exists() ?: false)
+
+        // Act
+        runBlocking { tableObject.deleteImmediately() }
+
+        // Assert
+        Assert.assertFalse(tableObject.file?.exists() ?: false)
+        val tableObjectFromDatabase = runBlocking { Dav.Database.getTableObject(uuid) }
+        Assert.assertNull(tableObjectFromDatabase)
+    }
+    // End deleteImmediately tests
 
     private fun File.copyInputStreamToFile(inputStream: InputStream) {
         // Return the progress as int between 0 and 100
