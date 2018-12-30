@@ -297,6 +297,48 @@ class TableObjectInstrumentedTest {
     }
     // End deleteImmediately tests
 
+    // saveVisibility tests
+    @Test
+    fun saveVisibilityShouldSetTheVisibilityOfTheTableObjectAndSaveItInTheDatabase(){
+        // Arrange
+        val tableId = 7
+        val tableObject = runBlocking { TableObject.create(tableId) }
+        val oldVisibility = tableObject.visibility
+        val newVisibility = TableObjectVisibility.Public
+
+        // Act
+        runBlocking { tableObject.saveVisibility(newVisibility) }
+
+        // Assert
+        Assert.assertEquals(newVisibility, tableObject.visibility)
+        Assert.assertNotEquals(oldVisibility, tableObject.visibility)
+
+        val tableObject2 = runBlocking { Dav.Database.getTableObject(tableObject.uuid) }
+        Assert.assertNotNull(tableObject2)
+        Assert.assertEquals(newVisibility, tableObject2!!.visibility)
+    }
+    // End saveVisibility tests
+
+    // create(tableId: Int) tests
+    @Test
+    fun createWithTableIdShouldCreateNewTableObject(){
+        // Arrange
+        val tableId = 5
+
+        // Act
+        val tableObject = runBlocking { TableObject.create(tableId) }
+
+        // Assert
+        Assert.assertNotEquals(tableId, tableObject.id)
+
+        val tableObjectFromDatabase = database.tableObjectDao().getTableObject(tableObject.id)
+        Assert.assertNotNull(tableObjectFromDatabase)
+        Assert.assertEquals(tableObject.id, tableObjectFromDatabase.id)
+        Assert.assertEquals(tableId, tableObjectFromDatabase.tableId)
+        Assert.assertEquals(tableObject.uuid, UUID.fromString(tableObjectFromDatabase.uuid))
+    }
+    // End create(tableId: Int) tests
+
     private fun File.copyInputStreamToFile(inputStream: InputStream) {
         // Return the progress as int between 0 and 100
         inputStream.use { input ->
