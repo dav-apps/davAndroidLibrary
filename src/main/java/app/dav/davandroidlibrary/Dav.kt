@@ -47,7 +47,7 @@ object Dav {
 
     object Database{
         private fun createTableObjectAsync(tableObject: TableObject, scope: CoroutineScope): Deferred<Long> = scope.async {
-            database?.tableObjectDao()?.insertTableObject(TableObject.convertTableObjectToTableObjectEntity(tableObject)) ?: 0
+            database?.tableObjectDao()?.insertTableObject(tableObject.toTableObjectEntity()) ?: 0
         }
 
         fun createTableObjectAsync(tableObject: TableObject) : Deferred<Long> = createTableObjectAsync(tableObject, databaseScope)
@@ -57,7 +57,7 @@ object Dav {
         }
 
         private fun createTableObjectWithPropertiesAsync(tableObject: TableObject, scope: CoroutineScope) : Deferred<Long> = scope.async {
-            val tableObjectEntity = TableObject.convertTableObjectToTableObjectEntity(tableObject)
+            val tableObjectEntity = tableObject.toTableObjectEntity()
             val id = database?.tableObjectDao()?.insertTableObject(tableObjectEntity) ?: 0
             if(!id.equals(0)){
                 for(property in tableObject.properties){
@@ -137,7 +137,7 @@ object Dav {
         }
 
         private fun updateTableObjectAsync(tableObject: TableObject, scope: CoroutineScope) : Deferred<Unit?> = scope.async {
-            database?.tableObjectDao()?.updateTableObject(TableObject.convertTableObjectToTableObjectEntity(tableObject))
+            database?.tableObjectDao()?.updateTableObject(tableObject.toTableObjectEntity())
         }
 
         fun updateTableObjectAsync(tableObject: TableObject) : Deferred<Unit?> = updateTableObjectAsync(tableObject, databaseScope)
@@ -174,7 +174,7 @@ object Dav {
 
         private fun deleteTableObjectImmediatelyAsync(uuid: UUID, scope: CoroutineScope) : Deferred<Unit?> = scope.async {
             val tableObject = getTableObjectAsync(uuid).await() ?: return@async
-            val tableObjectEntity = TableObject.convertTableObjectToTableObjectEntity(tableObject)
+            val tableObjectEntity = tableObject.toTableObjectEntity()
             database?.tableObjectDao()?.deleteTableObject(tableObjectEntity)
         }
 

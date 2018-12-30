@@ -322,6 +322,34 @@ class TableObjectInstrumentedTest {
     }
     // End saveVisibility tests
 
+    // toTableObjectEntity tests
+    @Test
+    fun toTableObjectEntityShouldReturnValidTableObjectEntityObject(){
+        // Arrange
+        val uuid = UUID.randomUUID()
+        val tableId = 54
+        val properties = arrayListOf<Property>(
+                Property(0, "page1", "Hello World"),
+                Property(0, "page2", "Hallo Welt")
+        )
+        val tableObject = runBlocking { TableObject.create(UUID.randomUUID(), 12, properties) }
+        runBlocking {
+            tableObject.saveVisibility(TableObjectVisibility.Public)
+            tableObject.uploadStatus = TableObjectUploadStatus.Updated
+        }
+
+        // Act
+        val tableObjectEntity = tableObject.toTableObjectEntity()
+
+        // Assert
+        Assert.assertEquals(tableObject.id, tableObjectEntity.id)
+        Assert.assertEquals(tableObject.tableId,  tableObjectEntity.tableId)
+        Assert.assertEquals(tableObject.uuid, UUID.fromString(tableObjectEntity.uuid))
+        Assert.assertEquals(tableObject.visibility.visibility, tableObjectEntity.visibility)
+        Assert.assertEquals(tableObject.uploadStatus.uploadStatus, tableObjectEntity.uploadStatus)
+    }
+    // End toTableObjectEntity tests
+
     // create(tableId: Int) tests
     @Test
     fun createWithTableIdShouldCreateNewTableObject(){

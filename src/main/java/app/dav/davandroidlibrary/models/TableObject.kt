@@ -478,6 +478,17 @@ class TableObject{
         }
     }
 
+    fun toTableObjectEntity() : TableObjectEntity{
+        val tableObjectEntity = TableObjectEntity(tableId,
+                uuid.toString(),
+                visibility.visibility,
+                uploadStatus.uploadStatus,
+                isFile,
+                etag)
+        tableObjectEntity.id = if(id == 0L) null else id
+        return tableObjectEntity
+    }
+
     private fun File.copyInputStreamToFile(inputStream: InputStream, reportProgress: (progress: Int) -> Unit) {
         // Return the progress as int between 0 and 100
         inputStream.use { input ->
@@ -544,17 +555,6 @@ class TableObject{
             tableObject.isFile = obj.isFile
             tableObject.etag = obj.etag
             return tableObject
-        }
-
-        fun convertTableObjectToTableObjectEntity(tableObject: TableObject) : TableObjectEntity {
-            val tableObjectEntity = TableObjectEntity(tableObject.tableId,
-                    tableObject.uuid.toString(),
-                    tableObject.visibility.visibility,
-                    tableObject.uploadStatus.uploadStatus,
-                    tableObject.isFile,
-                    tableObject.etag)
-            tableObjectEntity.id = if(tableObject.id == 0L) null else tableObject.id
-            return tableObjectEntity
         }
 
         internal fun convertTableObjectDataToTableObject(tableObjectData: TableObjectData) : TableObject{
