@@ -4,15 +4,19 @@ import android.support.test.InstrumentationRegistry
 import android.support.test.runner.AndroidJUnit4
 import app.dav.davandroidlibrary.Constants
 import app.dav.davandroidlibrary.Dav
+import app.dav.davandroidlibrary.HttpResultEntry
 import app.dav.davandroidlibrary.common.*
-import app.dav.davandroidlibrary.models.Property
-import app.dav.davandroidlibrary.models.TableObject
-import app.dav.davandroidlibrary.models.TableObjectUploadStatus
+import app.dav.davandroidlibrary.models.*
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.junit.Assert
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.io.IOException
 import java.util.*
 
 @RunWith(AndroidJUnit4::class)
@@ -104,4 +108,234 @@ class DataManagerInstrumentedTest {
         Assert.assertNotNull(secondTableObjectFromServer)
     }
     // End sync tests
+
+    // syncPush tests
+    @Test
+    fun syncPushShouldUploadCreatedTableObjects(){
+        // Arrange
+        ProjectInterface.localDataSettings?.setStringValue(Dav.jwtKey, Constants.jwt)
+        val uuid = UUID.randomUUID()
+        val tableId = Constants.testDataTableId
+        val firstPropertyName = "text"
+        val firstPropertyValue = "Lorem ipsum"
+        val secondPropertyName = "test"
+        val secondPropertyValue = "true"
+        val properties = arrayListOf<Property>(
+                Property(0, firstPropertyName, firstPropertyValue),
+                Property(0, secondPropertyName, secondPropertyValue)
+        )
+
+        runBlocking { TableObject.create(uuid, tableId, properties) }
+        var tableObjectFromDatabase = runBlocking { Dav.Database.getTableObject(uuid) }
+        Assert.assertNotNull(tableObjectFromDatabase)
+
+        // Act
+        DataManager.isSyncing = false
+        runBlocking { DataManager.syncPush().await() }
+        DataManager.isSyncing = true
+
+        // Assert
+        // Get the created table object from the server
+        val response = runBlocking { httpGet(Constants.jwt, "apps/object/$uuid").await() }
+        Assert.assertTrue(response.key)
+        val tableObjectFromServer = TableObjectData(response.value)
+        tableObjectFromDatabase = runBlocking { Dav.Database.getTableObject(uuid) }
+
+        Assert.assertEquals(tableId, tableObjectFromDatabase!!.tableId)
+        Assert.assertEquals(tableId, tableObjectFromServer.table_id)
+        Assert.assertEquals(TableObjectUploadStatus.UpToDate, tableObjectFromDatabase.uploadStatus)
+
+        // Etags should be equal
+        Assert.assertEquals(tableObjectFromDatabase.etag, tableObjectFromServer.etag)
+
+        // Both table objects should have the same properties
+        Assert.assertEquals(firstPropertyValue, tableObjectFromServer.properties?.get(firstPropertyName))
+        Assert.assertEquals(secondPropertyValue, tableObjectFromServer.properties?.get(secondPropertyName))
+
+        Assert.assertEquals(firstPropertyName, tableObjectFromDatabase.properties[0].name)
+        Assert.assertEquals(firstPropertyValue, tableObjectFromDatabase.properties[0].value)
+        Assert.assertEquals(secondPropertyName, tableObjectFromDatabase.properties[1].name)
+        Assert.assertEquals(secondPropertyValue, tableObjectFromDatabase.properties[1].value)
+
+        // Delete the table object on the server
+        val response2 = runBlocking { httpDelete(Constants.jwt, "apps/object/$uuid").await() }
+        Assert.assertTrue(response2.key)
+    }
+
+    @Test
+    fun syncPushShouldUploadUpdatedTableObjects(){
+        // Arrange
+        ProjectInterface.localDataSettings?.setStringValue(Dav.jwtKey, Constants.jwt)
+        DataManager.isSyncing = false
+        runBlocking { DataManager.sync().await() }
+        DataManager.isSyncing = true
+        val tableObject = runBlocking { Dav.Database.getTableObject(Constants.testDataFirstTableObject.uuid) }
+        val property = tableObject!!.properties[0]
+        val propertyName = property.name
+        val oldPropertyValue = property.value
+        val newPropertyValue = "newTestData"
+        runBlocking {
+            property.setPropertyValue(newPropertyValue)
+            tableObject.saveUploadStatus(TableObjectUploadStatus.Updated)
+        }
+
+        // Act
+        DataManager.isSyncing = false
+        runBlocking { DataManager.syncPush().await() }
+        DataManager.isSyncing = true
+
+        // Assert
+        // Get the updated object from the server
+        val response = runBlocking { httpGet(Constants.jwt, "apps/object/${tableObject.uuid}").await() }
+        Assert.assertTrue(response.key)
+        val tableObjectFromServer = TableObjectData(response.value)
+        val tableObjectFromDatabase = runBlocking { Dav.Database.getTableObject(tableObject.uuid) }
+
+        Assert.assertEquals(newPropertyValue, tableObjectFromServer.properties?.get(propertyName))
+        Assert.assertEquals(newPropertyValue, tableObjectFromDatabase!!.properties[0].value)
+        Assert.assertEquals(TableObjectUploadStatus.UpToDate, tableObjectFromDatabase.uploadStatus)
+
+        // Revert changes
+        runBlocking {
+            tableObjectFromDatabase.setPropertyValue(propertyName, oldPropertyValue)
+            DataManager.isSyncing = false
+            DataManager.syncPush().await()
+        }
+        val tableObjectFromDatabase2 = runBlocking { Dav.Database.getTableObject(tableObject.uuid) }
+        Assert.assertEquals(oldPropertyValue, tableObjectFromDatabase2!!.getPropertyValue(propertyName))
+        Assert.assertEquals(TableObjectUploadStatus.UpToDate, tableObjectFromDatabase2.uploadStatus)
+    }
+
+    @Test
+    fun syncPushShouldUploadDeletedTableObjects(){
+        // Arrange
+        ProjectInterface.localDataSettings?.setStringValue(Dav.jwtKey, Constants.jwt)
+        val uuid = UUID.randomUUID()
+        val tableId = Constants.testDataTableId
+        val properties = arrayListOf<Property>(
+                Property(0, "page1", "bla"),
+                Property(0, "page2", "blablabla")
+        )
+        // Create a new table object and upload it
+        val tableObject = runBlocking {
+            TableObject.create(uuid, tableId, properties)
+        }
+        var tableObjectFromDatabase = runBlocking { Dav.Database.getTableObject(uuid) }
+        Assert.assertNotNull(tableObjectFromDatabase)
+
+        DataManager.isSyncing = false
+        runBlocking { DataManager.syncPush().await() }
+        DataManager.isSyncing = true
+
+        // Check if the table object was uploaded
+        var response = runBlocking { httpGet(Constants.jwt, "apps/object/${tableObject.uuid}").await() }
+        Assert.assertTrue(response.key)
+
+        // Set the upload status of the table object to deleted
+        runBlocking { tableObjectFromDatabase?.saveUploadStatus(TableObjectUploadStatus.Deleted) }
+
+        // Act
+        DataManager.isSyncing = false
+        runBlocking { DataManager.syncPush().await() }
+        DataManager.isSyncing = true
+
+        // Assert
+        response = runBlocking { httpGet(Constants.jwt, "apps/object/${tableObject.uuid}").await() }
+        Assert.assertFalse(response.key)
+        Assert.assertTrue(response.value.contains("2805"))
+
+        tableObjectFromDatabase = runBlocking { Dav.Database.getTableObject(uuid) }
+        Assert.assertNull(tableObjectFromDatabase)
+    }
+
+    @Test
+    fun syncPushShouldDeleteUpdatedTableObjectsThatDoNotExistOnTheServer(){
+        // Arrange
+        ProjectInterface.localDataSettings?.setStringValue(Dav.jwtKey, Constants.jwt)
+        val uuid = UUID.randomUUID()
+        val tableId = Constants.testDataTableId
+        val properties = arrayListOf<Property>(
+                Property(0, "page1", "bla"),
+                Property(0, "page2", "blablabla")
+        )
+        // Create a new table object
+        runBlocking { TableObject.create(uuid, tableId, properties) }
+        var tableObjectFromDatabase = runBlocking { Dav.Database.getTableObject(uuid) }
+        Assert.assertNotNull(tableObjectFromDatabase)
+
+        // Set the uploadStatus of the table object to Updated
+        runBlocking { tableObjectFromDatabase!!.saveUploadStatus(TableObjectUploadStatus.Updated) }
+
+        // Act
+        DataManager.isSyncing = false
+        runBlocking { DataManager.syncPush().await() }
+        DataManager.isSyncing = true
+
+        // Assert
+        // The table object should not exist
+        tableObjectFromDatabase = runBlocking { Dav.Database.getTableObject(uuid) }
+        Assert.assertNull(tableObjectFromDatabase)
+    }
+
+    @Test
+    fun syncPushShouldDeleteDeletedTableObjectsThatDoNotExistOnTheServer(){
+        // Arrange
+        ProjectInterface.localDataSettings?.setStringValue(Dav.jwtKey, Constants.jwt)
+        val uuid = UUID.randomUUID()
+        val tableId = Constants.testDataTableId
+        val properties = arrayListOf<Property>(
+                Property(0, "page1", "bla"),
+                Property(0, "page2", "blablabla")
+        )
+        // Create a new table object
+        runBlocking { TableObject.create(uuid, tableId, properties) }
+        var tableObjectFromDatabase = runBlocking { Dav.Database.getTableObject(uuid) }
+        Assert.assertNotNull(tableObjectFromDatabase)
+
+        // Set the uploadStatus of the table object to Updated
+        runBlocking { tableObjectFromDatabase!!.saveUploadStatus(TableObjectUploadStatus.Deleted) }
+
+        // Act
+        DataManager.isSyncing = false
+        runBlocking { DataManager.syncPush().await() }
+        DataManager.isSyncing = true
+
+        // Assert
+        // The table object should not exist
+        tableObjectFromDatabase = runBlocking { Dav.Database.getTableObject(uuid) }
+        Assert.assertNull(tableObjectFromDatabase)
+    }
+    // End syncPush tests
+
+    // Helper functions
+    fun httpGet(jwt: String, url: String) = GlobalScope.async {
+        val client = OkHttpClient()
+        val request = Request.Builder()
+                .url(Dav.apiBaseUrl + url)
+                .header("Authorization", jwt)
+                .build()
+
+        try {
+            val response = client.newCall(request).execute()
+            HttpResultEntry(response.isSuccessful, response.body()?.string() ?: "")
+        }catch (e: IOException){
+            HttpResultEntry(false, e.message ?: "There was an error")
+        }
+    }
+
+    fun httpDelete(jwt: String, url: String) = GlobalScope.async {
+        val client = OkHttpClient()
+        val request = Request.Builder()
+                .url(Dav.apiBaseUrl + url)
+                .header("Authorization", jwt)
+                .delete()
+                .build()
+
+        try {
+            val response = client.newCall(request).execute()
+            HttpResultEntry(response.isSuccessful, response.body()?.string() ?: "")
+        }catch (e: IOException){
+            HttpResultEntry(false, e.message ?: "There was an error")
+        }
+    }
 }

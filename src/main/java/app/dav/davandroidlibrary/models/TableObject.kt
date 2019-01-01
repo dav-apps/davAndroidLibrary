@@ -7,6 +7,7 @@ import android.arch.persistence.room.PrimaryKey
 import android.util.Log
 import android.webkit.MimeTypeMap
 import app.dav.davandroidlibrary.Dav
+import app.dav.davandroidlibrary.DavEnvironment
 import app.dav.davandroidlibrary.common.ProjectInterface
 import app.dav.davandroidlibrary.data.DataManager
 import app.dav.davandroidlibrary.data.extPropertyName
@@ -90,8 +91,10 @@ class TableObject{
             }
         }
 
-        GlobalScope.launch(Dispatchers.IO) {
-            DataManager.syncPush().await()
+        if(Dav.environment != DavEnvironment.Test){
+            GlobalScope.launch(Dispatchers.IO) {
+                DataManager.syncPush().await()
+            }
         }
     }
 
@@ -135,7 +138,8 @@ class TableObject{
             uploadStatus = TableObjectUploadStatus.Updated
 
         save()
-        GlobalScope.launch(Dispatchers.IO) { DataManager.syncPush().await() }
+        if(Dav.environment != DavEnvironment.Test)
+            GlobalScope.launch(Dispatchers.IO) { DataManager.syncPush().await() }
     }
 
     fun getPropertyValue(name: String) : String?{
