@@ -5,4 +5,5 @@ interface IRetrieveConstants {
     fun getApiKey() : String
     fun getAppId() : Int
     fun getTableIds() : ArrayList<Int>
+    fun getParallelTableIds() : ArrayList<Int>
 }

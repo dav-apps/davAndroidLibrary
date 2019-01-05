@@ -72,82 +72,79 @@ class DataManager{
             fileDownloadQueue.clear()
             fileDownloadProgress.clear()
 
-            // Get the specified tables
+            // Holds the table ids, e.g. 1, 2, 3, 4
             val tableIds = ProjectInterface.retrieveConstants?.getTableIds() ?: return@async
+            // Holds the parallel table ids, e.g. 2, 3
+            val parallelTableIds = ProjectInterface.retrieveConstants?.getParallelTableIds() ?: return@async
+            // Holds the order of the table ids, sorted by the pages and the parallel pages, e.g. 1, 2, 3, 2, 3, 4
+            var sortedTableIds = arrayListOf<Int>()
+            // Holds the pages of the table; in the format <tableId, pages>
+            val tablePages = HashMap<Int, Int>()
+            // Holds the last downloaded page
+            val currentTablePages = HashMap<Int, Int>()
+            // Holds the latest table result; in the format <tableId, tableData>
+            val tableResults = HashMap<Int, TableData>()
+            // Holds the uuids of the table objects that were removed on the server but not locally; in the format <tableId, ArrayList<UUID>>
+            val removedTableObjectUuids = HashMap<Int, ArrayList<UUID>>()
+            // Is true if all http calls of the specified table are successful; in the format <tableId, Boolean>
+            val tableGetResultsOkay = HashMap<Int, Boolean>()
+
+            // Populate removedTableObjectUuids
             for(tableId in tableIds){
-                var tableGetResult: HttpResultEntry
-                var table: TableData
-                var tableGetResultsOkay = true
+                removedTableObjectUuids[tableId] = ArrayList()
+
+                for(tableObject in Dav.Database.getAllTableObjectsAsync(tableId, true).await())
+                    removedTableObjectUuids[tableId]!!.add(tableObject.uuid)
+            }
+
+            // Get the first page of each table and generate the sorted tableIds list
+            for(tableId in tableIds){
+                // Get the first page of the table
+                val tableGetResult = httpGet(jwt, "apps/table/$tableId?page=1").await()
+
+                tableGetResultsOkay[tableId] = tableGetResult.key
+                if(!tableGetResult.key)
+                    continue
+
+                // Save the result
+                tableResults[tableId] = TableData(tableGetResult.value)
+                tablePages[tableId] = tableResults[tableId]!!.pages
+                currentTablePages[tableId] = 1
+            }
+
+            sortedTableIds = sortTableIds(tableIds, parallelTableIds, tablePages)
+
+            // Process the table results
+            for(tableId in sortedTableIds){
+                tableResults[tableId]
+                val tableObjects = tableResults[tableId]?.table_objects ?: continue
                 var tableChanged = false
 
-                val removedTableObjectUuids: ArrayList<UUID> = ArrayList()
-                for(tableObject in Dav.Database.getAllTableObjectsAsync(tableId, true).await())
-                    removedTableObjectUuids.add(tableObject.uuid)
+                if(tableGetResultsOkay[tableId] != true) continue
 
-                var pages = 1
-                var i = 1
+                // Get the objects of the table
+                for(obj in tableObjects){
+                    removedTableObjectUuids[tableId]?.remove(obj.uuid)
 
-                while (i <= pages){
-                    // Get the next page of the table
-                    tableGetResult = httpGet(jwt, "apps/table/$tableId?page=$i").await()
-                    if(!tableGetResult.key){
-                        tableGetResultsOkay = false
-                        continue
-                    }
-
-                    table = TableData(tableGetResult.value)
-                    pages = table.pages
-                    val tableObjects = table.table_objects ?: continue
-
-                    // Get the objects of the table
-                    for(obj in tableObjects){
-                        removedTableObjectUuids.remove(obj.uuid)
-
-                        // Is obj in the database?
-                        val currentTableObject = Dav.Database.getTableObjectAsync(obj.uuid).await()
-                        if(currentTableObject != null){
-                            // Is the etag correct?
-                            if(obj.etag == currentTableObject.etag){
-                                // Is it a file?
-                                if(currentTableObject.isFile){
-                                    // Was the file downloaded?
-                                    if(!currentTableObject.fileDownloaded()){
-                                        // Download the file
-                                        fileDownloadQueue.add(currentTableObject)
-                                    }
-                                }
-                            }else{
-                                // GET the table object
-                                val tableObject = downloadTableObject(currentTableObject.uuid) ?: continue
-                                tableObject.uploadStatus = TableObjectUploadStatus.UpToDate
-
-                                // Is it a file?
-                                if(tableObject.isFile){
-                                    // Remove all properties except ext
-                                    val removingProperties = ArrayList<Property>()
-                                    for(p in tableObject.properties)
-                                        if(p.name != extPropertyName) removingProperties.add(p)
-
-                                    for(p in removingProperties)
-                                        tableObject.properties.remove(p)
-
-                                    // Save the ext property
-                                    tableObject.saveWithProperties()
-
+                    // Is obj in the database?
+                    val currentTableObject = Dav.Database.getTableObjectAsync(obj.uuid).await()
+                    if(currentTableObject != null){
+                        // Is the etag correct?
+                        if(obj.etag == currentTableObject.etag){
+                            // Is it a file?
+                            if(currentTableObject.isFile){
+                                // Was the file downloaded?
+                                if(!currentTableObject.fileDownloaded()){
                                     // Download the file
-                                    fileDownloadQueue.add(tableObject)
-                                }else{
-                                    // Save the table object
-                                    tableObject.saveWithProperties()
-                                    ProjectInterface.triggerAction?.updateTableObject(tableObject, false)
-                                    tableChanged = true
+                                    fileDownloadQueue.add(currentTableObject)
                                 }
                             }
                         }else{
                             // GET the table object
-                            val tableObject = downloadTableObject(obj.uuid) ?: continue
+                            val tableObject = downloadTableObject(currentTableObject.uuid) ?: continue
                             tableObject.uploadStatus = TableObjectUploadStatus.UpToDate
 
+                            // Is it a file?
                             if(tableObject.isFile){
                                 // Remove all properties except ext
                                 val removingProperties = ArrayList<Property>()
@@ -157,13 +154,11 @@ class DataManager{
                                 for(p in removingProperties)
                                     tableObject.properties.remove(p)
 
+                                // Save the ext property
                                 tableObject.saveWithProperties()
 
                                 // Download the file
                                 fileDownloadQueue.add(tableObject)
-
-                                ProjectInterface.triggerAction?.updateTableObject(tableObject, false)
-                                tableChanged = true
                             }else{
                                 // Save the table object
                                 tableObject.saveWithProperties()
@@ -171,15 +166,63 @@ class DataManager{
                                 tableChanged = true
                             }
                         }
+                    }else{
+                        // GET the table object
+                        val tableObject = downloadTableObject(obj.uuid) ?: continue
+                        tableObject.uploadStatus = TableObjectUploadStatus.UpToDate
+
+                        if(tableObject.isFile){
+                            // Remove all properties except ext
+                            val removingProperties = ArrayList<Property>()
+                            for(p in tableObject.properties)
+                                if(p.name != extPropertyName) removingProperties.add(p)
+
+                            for(p in removingProperties)
+                                tableObject.properties.remove(p)
+
+                            tableObject.saveWithProperties()
+
+                            // Download the file
+                            fileDownloadQueue.add(tableObject)
+
+                            ProjectInterface.triggerAction?.updateTableObject(tableObject, false)
+                            tableChanged = true
+                        }else{
+                            // Save the table object
+                            tableObject.saveWithProperties()
+                            ProjectInterface.triggerAction?.updateTableObject(tableObject, false)
+                            tableChanged = true
+                        }
                     }
-                    i++
                 }
 
-                if(!tableGetResultsOkay) continue
+                if(tableChanged)
+                    ProjectInterface.triggerAction?.updateAllOfTable(tableId)
 
-                // RemovedTableObjects now includes all objects that were deleted on the server but not locally
-                // Delete those objects locally
-                for(objUuid in removedTableObjectUuids){
+                // Check if there is a next page
+                currentTablePages[tableId] = (currentTablePages[tableId] ?: 0) + 1
+                if(currentTablePages[tableId] ?: 0 > tablePages[tableId] ?: 0){
+                    continue
+                }
+
+                // Get the data of the next page
+                val tableGetResult = httpGet(jwt, "apps/table/$tableId?page=${currentTablePages[tableId]}").await()
+                if(!tableGetResult.key){
+                    tableGetResultsOkay[tableId] = false
+                    continue
+                }
+
+                tableResults[tableId] = TableData(tableGetResult.value)
+            }
+
+            // RemovedTableObjects now includes all objects that were deleted on the server but not locally
+            // Delete those objects locally
+            for(tableId in tableIds){
+                if(tableGetResultsOkay[tableId] != true) continue
+                val removedTableObjects = removedTableObjectUuids[tableId] ?: continue
+                var tableChanged = false
+
+                for(objUuid in removedTableObjects){
                     val obj = Dav.Database.getTableObjectAsync(objUuid).await() ?: continue
 
                     if(obj.uploadStatus == TableObjectUploadStatus.New && obj.isFile){
@@ -304,6 +347,90 @@ class DataManager{
 
             if(fileDownloadQueue.count() > 0)
                 downloadHandler.postDelayed(downloadRunnable, 5000)
+        }
+
+        internal fun sortTableIds(tableIds: ArrayList<Int>, parallelTableIds: ArrayList<Int>, tableIdPages: HashMap<Int, Int>) : ArrayList<Int>{
+            val preparedTableIds = arrayListOf<Int>()
+
+            // Remove all table ids in parallelTableIds that do not exist in tableIds
+            val removeParallelTableIds = arrayListOf<Int>()
+            for(i in 0 until parallelTableIds.size - 1){
+                val value = parallelTableIds[i]
+                if(!tableIds.contains(value)){
+                    removeParallelTableIds.add(value)
+                }
+            }
+            parallelTableIds.removeAll(removeParallelTableIds)
+
+            // Prepare pagesOfParallelTable
+            val pagesOfParallelTable = HashMap<Int, Int>()
+            tableIdPages.forEach {
+                if(parallelTableIds.contains(it.key))
+                    pagesOfParallelTable[it.key] = it.value
+            }
+
+            // Count the pages
+            var pagesSum = 0
+            tableIdPages.forEach{
+                pagesSum += it.value
+
+                if(parallelTableIds.contains(it.key)){
+                    pagesOfParallelTable[it.key] = it.value - 1
+                }
+            }
+
+            var index = 0
+            var currentTableIdIndex = 0
+            var parallelTableIdsInserted = false
+
+            while(index < pagesSum){
+                val currentTableId = tableIds[currentTableIdIndex]
+                val currentTablePages = tableIdPages[currentTableId]
+
+                if(parallelTableIds.contains(currentTableId)){
+                    // Add the table id once if it belongs to parallel table ids
+                    preparedTableIds.add(currentTableId)
+                    index++
+                }else{
+                    // Add it for all pages
+                    for(j in 1 .. (currentTablePages ?: 1)){
+                        preparedTableIds.add(currentTableId)
+                        index++
+                    }
+                }
+
+                // Check if all parallel table ids are in prepared table ids
+                if(preparedTableIds.containsAll(parallelTableIds) && !parallelTableIdsInserted){
+                    parallelTableIdsInserted = true
+
+                    var pagesOfParallelTableSum = 0
+
+                    // Update pagesOfParallelTableSum
+                    pagesOfParallelTable.forEach{
+                        pagesOfParallelTableSum += it.value
+                    }
+
+                    // Add the parallel table ids in the right order
+                    while(pagesOfParallelTableSum > 0){
+                        for(parallelTableId in parallelTableIds){
+                            if((pagesOfParallelTable[parallelTableId] ?: 0) > 0){
+                                preparedTableIds.add(parallelTableId)
+                                pagesOfParallelTableSum--
+
+                                if(pagesOfParallelTable[parallelTableId] != null){
+                                    pagesOfParallelTable[parallelTableId] = (pagesOfParallelTable[parallelTableId] ?: 0) - 1
+                                }
+
+                                index++
+                            }
+                        }
+                    }
+                }
+
+                currentTableIdIndex++
+            }
+
+            return preparedTableIds
         }
     }
 }
