@@ -26,4 +26,8 @@ class RetrieveConstants : IRetrieveConstants {
                 Constants.testFileTableId
         )
     }
+
+    override fun getParallelTableIds(): ArrayList<Int> {
+        return arrayListOf()
+    }
 }

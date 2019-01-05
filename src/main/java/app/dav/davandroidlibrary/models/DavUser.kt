@@ -16,6 +16,7 @@ import java.util.concurrent.TimeUnit
 
 private const val avatarFileName = "avatar.png"
 private val avatarFilePath = Dav.dataPath + avatarFileName
+private const val syncWorkTag = "syncWork"
 
 class DavUser() {
     var email: String
@@ -58,10 +59,10 @@ class DavUser() {
                     .setRequiresBatteryNotLow(true)
                     .build()
 
-            val request: WorkRequest = PeriodicWorkRequestBuilder<SyncWorker>(1, TimeUnit.DAYS)
+            val request: PeriodicWorkRequest = PeriodicWorkRequestBuilder<SyncWorker>(1, TimeUnit.DAYS)
                     .setConstraints(constraints)
                     .build()
-            WorkManager.getInstance().enqueue(request)
+            WorkManager.getInstance().enqueueUniquePeriodicWork(syncWorkTag, ExistingPeriodicWorkPolicy.KEEP, request)
         }else{
             isLoggedIn = false
         }
