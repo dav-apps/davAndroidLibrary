@@ -80,7 +80,7 @@ class DataManager{
             var sortedTableIds = arrayListOf<Int>()
             // Holds the pages of the table; in the format <tableId, pages>
             val tablePages = HashMap<Int, Int>()
-            // Holds the last downloaded page
+            // Holds the last downloaded page; in the format <tableId, pages>
             val currentTablePages = HashMap<Int, Int>()
             // Holds the latest table result; in the format <tableId, tableData>
             val tableResults = HashMap<Int, TableData>()
@@ -116,7 +116,6 @@ class DataManager{
 
             // Process the table results
             for(tableId in sortedTableIds){
-                tableResults[tableId]
                 val tableObjects = tableResults[tableId]?.table_objects ?: continue
                 var tableChanged = false
 
@@ -393,7 +392,7 @@ class DataManager{
                     index++
                 }else{
                     // Add it for all pages
-                    for(j in 1 .. (currentTablePages ?: 1)){
+                    for(j in 1 until (currentTablePages ?: 1)){
                         preparedTableIds.add(currentTableId)
                         index++
                     }
@@ -402,7 +401,6 @@ class DataManager{
                 // Check if all parallel table ids are in prepared table ids
                 if(preparedTableIds.containsAll(parallelTableIds) && !parallelTableIdsInserted){
                     parallelTableIdsInserted = true
-
                     var pagesOfParallelTableSum = 0
 
                     // Update pagesOfParallelTableSum
