@@ -18,6 +18,7 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.io.IOException
 import java.util.*
+import kotlin.collections.HashMap
 
 @RunWith(AndroidJUnit4::class)
 class DataManagerInstrumentedTest {
@@ -306,6 +307,170 @@ class DataManagerInstrumentedTest {
         Assert.assertNull(tableObjectFromDatabase)
     }
     // End syncPush tests
+
+    // sortTableIds tests
+    @Test
+    fun sortTableIdsShouldReturnTheCorrectArrayWhenThereAreNoParallelTableIds(){
+        /*
+            Input:
+                tableIds:           1, 2, 3, 4
+                parallelTableIds:
+                pages:              2, 2, 2, 2
+
+            Output:
+                [1, 1, 2, 2, 3, 3, 4, 4]
+        */
+        // Arrange
+        val tableIds = arrayListOf<Int>(1, 2, 3, 4)
+        val parallelTableIds = arrayListOf<Int>()
+        val tableIdPages = HashMap<Int, Int>()
+        tableIdPages[1] = 2
+        tableIdPages[2] = 2
+        tableIdPages[3] = 2
+        tableIdPages[4] = 2
+
+        // Act
+        val sortedTableIds = DataManager.sortTableIds(tableIds, parallelTableIds, tableIdPages)
+
+        // Assert
+        Assert.assertArrayEquals(arrayListOf(1, 1, 2, 2, 3, 3, 4, 4).toArray(), sortedTableIds.toArray())
+    }
+
+    @Test
+    fun sortTableIdsShouldReturnTheCorrectArrayWhenThereIsOneParallelTableId(){
+        /*
+            Input:
+                tableIds:           1, 2, 3, 4
+                parallelTableIds:      2
+                pages:              2, 2, 2, 2
+
+            Output:
+                [1, 1, 2, 2, 3, 3, 4, 4]
+        */
+        // Arrange
+        val tableIds = arrayListOf<Int>(1, 2, 3, 4)
+        val parallelTableIds = arrayListOf<Int>(2)
+        val tableIdPages = HashMap<Int, Int>()
+        tableIdPages[1] = 2
+        tableIdPages[2] = 2
+        tableIdPages[3] = 2
+        tableIdPages[4] = 2
+
+        // Act
+        val sortedTableIds = DataManager.sortTableIds(tableIds, parallelTableIds, tableIdPages)
+
+        // Assert
+        Assert.assertArrayEquals(arrayListOf(1, 1, 2, 2, 3, 3, 4, 4).toArray(), sortedTableIds.toArray())
+    }
+
+    @Test
+    fun sortTableIdsShouldReturnTheCorrectArrayWhenTheParallelTableIdsAreSideBySide(){
+        /*
+            Input:
+                tableIds:           1, 2, 3, 4
+                parallelTableIds:      2, 3
+                pages:              2, 2, 2, 2
+
+            Output:
+                [1, 1, 2, 3, 2, 3, 4, 4]
+        */
+        // Arrange
+        val tableIds = arrayListOf<Int>(1, 2, 3, 4)
+        val parallelTableIds = arrayListOf<Int>(2, 3)
+        val tableIdPages = HashMap<Int, Int>()
+        tableIdPages[1] = 2
+        tableIdPages[2] = 2
+        tableIdPages[3] = 2
+        tableIdPages[4] = 2
+
+        // Act
+        val sortedTableIds = DataManager.sortTableIds(tableIds, parallelTableIds, tableIdPages)
+
+        // Assert
+        Assert.assertArrayEquals(arrayListOf(1, 1, 2, 3, 2, 3, 4, 4).toArray(), sortedTableIds.toArray())
+    }
+
+    @Test
+    fun sortTableIdsShouldReturnTheCorrectArrayWhenTheParallelTableIdsAreNotSideBySide(){
+        /*
+            Input:
+                tableIds:           1, 2, 3, 4
+                parallelTableIds:   1,       4
+                pages:              2, 2, 2, 2
+
+            Output:
+                [1, 2, 2, 3, 3, 4, 1, 4]
+        */
+        // Arrange
+        val tableIds = arrayListOf<Int>(1, 2, 3, 4)
+        val parallelTableIds = arrayListOf<Int>(1, 4)
+        val tableIdPages = HashMap<Int, Int>()
+        tableIdPages[1] = 2
+        tableIdPages[2] = 2
+        tableIdPages[3] = 2
+        tableIdPages[4] = 2
+
+        // Act
+        val sortedTableIds = DataManager.sortTableIds(tableIds, parallelTableIds, tableIdPages)
+
+        // Assert
+        Assert.assertArrayEquals(arrayListOf(1, 2, 2, 3, 3, 4, 1, 4).toArray(), sortedTableIds.toArray())
+    }
+
+    @Test
+    fun sortTableIdsShouldReturnTheCorrectArrayWhenThereAreDifferentPagesAndTheParallelTableIdsAreNotSideBySide(){
+        /*
+            Input:
+                tableIds:           1, 2, 3, 4
+                parallelTableIds:   1,       4
+                pages:              3, 1, 2, 4
+
+            Output:
+                [1, 2, 3, 3, 4, 1, 4, 1, 4, 4]
+        */
+        // Arrange
+        val tableIds = arrayListOf<Int>(1, 2, 3, 4)
+        val parallelTableIds = arrayListOf<Int>(1, 4)
+        val tableIdPages = HashMap<Int, Int>()
+        tableIdPages[1] = 3
+        tableIdPages[2] = 1
+        tableIdPages[3] = 2
+        tableIdPages[4] = 4
+
+        // Act
+        val sortedTableIds = DataManager.sortTableIds(tableIds, parallelTableIds, tableIdPages)
+
+        // Assert
+        Assert.assertArrayEquals(arrayListOf(1, 2, 3, 3, 4, 1, 4, 1, 4, 4).toArray(), sortedTableIds.toArray())
+    }
+
+    @Test
+    fun sortTableIdsShouldReturnTheCorrectArrayWhenThereAreDifferentPagesAndTheParallelTableIdsAreSideBySide(){
+        /*
+            Input:
+                tableIds:           1, 2, 3, 4
+                parallelTableIds:   1, 2
+                pages:              2, 4, 3, 2
+
+            Output:
+                [1, 2, 1, 2, 2, 2, 3, 3, 3, 4, 4]
+        */
+        // Arrange
+        val tableIds = arrayListOf<Int>(1, 2, 3, 4)
+        val parallelTableIds = arrayListOf<Int>(1, 2)
+        val tableIdPages = HashMap<Int, Int>()
+        tableIdPages[1] = 2
+        tableIdPages[2] = 4
+        tableIdPages[3] = 3
+        tableIdPages[4] = 2
+
+        // Act
+        val sortedTableIds = DataManager.sortTableIds(tableIds, parallelTableIds, tableIdPages)
+
+        // Assert
+        Assert.assertArrayEquals(arrayListOf(1, 2, 1, 2, 2, 2, 3, 3, 3, 4, 4).toArray(), sortedTableIds.toArray())
+    }
+    // End sortTableIds tests
 
     // Helper functions
     fun httpGet(jwt: String, url: String) = GlobalScope.async {

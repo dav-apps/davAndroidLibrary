@@ -353,7 +353,7 @@ class DataManager{
 
             // Remove all table ids in parallelTableIds that do not exist in tableIds
             val removeParallelTableIds = arrayListOf<Int>()
-            for(i in 0 until parallelTableIds.size - 1){
+            for(i in 0 until parallelTableIds.size){
                 val value = parallelTableIds[i]
                 if(!tableIds.contains(value)){
                     removeParallelTableIds.add(value)
@@ -392,7 +392,7 @@ class DataManager{
                     index++
                 }else{
                     // Add it for all pages
-                    for(j in 1 until (currentTablePages ?: 1)){
+                    for(j in 0 until (currentTablePages ?: 1)){
                         preparedTableIds.add(currentTableId)
                         index++
                     }
