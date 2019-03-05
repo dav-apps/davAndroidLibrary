@@ -12,7 +12,7 @@ android {
         versionCode 4
         versionName "0.3.0"
 
-        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -24,20 +24,20 @@ android {
 }
 
 dependencies {
-    def roomVersion = "1.1.1"
-    def lifecycleVersion = "1.1.1"
-    def workVersion = "1.0.0-beta01"
+    def roomVersion = "2.1.0-alpha04"
+    def lifecycleVersion = "2.0.0"
+    def workVersion = "1.0.0-rc02"
 
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
-    implementation 'com.android.support:appcompat-v7:28.0.0'
+    implementation 'androidx.appcompat:appcompat:1.0.2'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
 
     // Room persistence library
-    implementation 'android.arch.persistence.room:runtime:' + roomVersion
-    kapt 'android.arch.persistence.room:compiler:' + roomVersion
+    implementation "androidx.room:room-runtime:$roomVersion"
+    kapt "androidx.room:room-compiler:$roomVersion"
 
-    implementation "android.arch.lifecycle:extensions:" + lifecycleVersion
+    implementation "androidx.lifecycle:lifecycle-extensions:$lifecycleVersion"
 
     // WorkManager
     implementation "android.arch.work:work-runtime-ktx:$workVersion"
@@ -53,9 +53,9 @@ dependencies {
 
     // Testing
     testImplementation 'junit:junit:4.12'
-    testImplementation 'androidx.test:core:1.1.0'
-    androidTestImplementation 'com.android.support.test:runner:1.0.2'
-    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.0'
+    androidTestImplementation 'androidx.test:runner:1.1.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.1.1'
 }
 repositories {
     mavenCentral()
