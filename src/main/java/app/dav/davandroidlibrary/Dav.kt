@@ -12,10 +12,9 @@ import java.io.File
 import java.util.*
 import kotlin.collections.ArrayList
 
-
 object Dav {
     private const val apiBaseUrlProduction = "https://dav-backend.herokuapp.com/v1/"
-    private const val apiBaseUrlDevelopment = "https://c1fbd7f8.ngrok.io/v1/"
+    private const val apiBaseUrlDevelopment = "https://c3c58136.ngrok.io/v1/"
 
     const val databaseName = "dav.db"
     var database: DavDatabase? = null

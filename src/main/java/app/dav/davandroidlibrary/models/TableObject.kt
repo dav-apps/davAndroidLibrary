@@ -1,11 +1,11 @@
 package app.dav.davandroidlibrary.models
 
-import android.arch.lifecycle.LiveData
-import android.arch.lifecycle.MutableLiveData
-import android.arch.persistence.room.Entity
-import android.arch.persistence.room.PrimaryKey
 import android.util.Log
 import android.webkit.MimeTypeMap
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 import app.dav.davandroidlibrary.Dav
 import app.dav.davandroidlibrary.DavEnvironment
 import app.dav.davandroidlibrary.common.ProjectInterface
@@ -34,7 +34,8 @@ data class TableObjectEntity(
         var isFile: Boolean,
         var etag: String
 ){
-    @PrimaryKey var id: Long? = null
+    @PrimaryKey
+    var id: Long? = null
 }
 
 class TableObject{
