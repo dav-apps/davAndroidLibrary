@@ -1,7 +1,7 @@
 package app.dav.davandroidlibrary.models
 
-import android.support.test.InstrumentationRegistry
-import android.support.test.runner.AndroidJUnit4
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import app.dav.davandroidlibrary.Dav
 import app.dav.davandroidlibrary.common.*
 import app.dav.davandroidlibrary.data.DavDatabase
@@ -12,7 +12,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class PropertyInstrumentedTest {
-    val context = InstrumentationRegistry.getTargetContext()
+    val context = InstrumentationRegistry.getInstrumentation().targetContext
     val database = DavDatabase.getInstance(context)
 
     init {

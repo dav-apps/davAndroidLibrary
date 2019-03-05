@@ -1,7 +1,6 @@
 package app.dav.davandroidlibrary;
 
 import org.junit.Test;
-
 import static org.junit.Assert.*;
 
 /**

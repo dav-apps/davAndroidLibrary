@@ -1,7 +1,7 @@
 package app.dav.davandroidlibrary.data
 
-import android.support.test.InstrumentationRegistry
-import android.support.test.runner.AndroidJUnit4
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import app.dav.davandroidlibrary.Constants
 import app.dav.davandroidlibrary.Dav
 import app.dav.davandroidlibrary.HttpResultEntry
@@ -22,7 +22,7 @@ import kotlin.collections.HashMap
 
 @RunWith(AndroidJUnit4::class)
 class DataManagerInstrumentedTest {
-    val context = InstrumentationRegistry.getTargetContext()
+    val context = InstrumentationRegistry.getInstrumentation().targetContext
     val database = DavDatabase.getInstance(context)
 
     init {

@@ -1,7 +1,7 @@
 package app.dav.davandroidlibrary.models
 
-import android.support.test.InstrumentationRegistry
-import android.support.test.runner.AndroidJUnit4
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import app.dav.davandroidlibrary.Constants
 import app.dav.davandroidlibrary.Dav
 import app.dav.davandroidlibrary.common.*
@@ -16,7 +16,7 @@ import java.util.*
 
 @RunWith(AndroidJUnit4::class)
 class TableObjectInstrumentedTest {
-    val context = InstrumentationRegistry.getTargetContext()
+    val context = InstrumentationRegistry.getInstrumentation().targetContext
     val database = DavDatabase.getInstance(context)
 
     init {
@@ -160,7 +160,7 @@ class TableObjectInstrumentedTest {
         val uuid = UUID.randomUUID()
 
         // Copy the file into the cache
-        val assetManager = InstrumentationRegistry.getContext().assets
+        val assetManager = InstrumentationRegistry.getInstrumentation().targetContext.assets
         val inputStream = assetManager.open("files/test/icon.ico")
         val file = File.createTempFile("icon", ".ico")
         file.copyInputStreamToFile(inputStream)
@@ -221,7 +221,7 @@ class TableObjectInstrumentedTest {
         val uuid = UUID.randomUUID()
 
         // Copy the file into the cache
-        val assetManager = InstrumentationRegistry.getContext().assets
+        val assetManager = InstrumentationRegistry.getInstrumentation().targetContext.assets
         val inputStream = assetManager.open("files/test/icon.ico")
         val file = File.createTempFile("icon", ".ico")
         file.copyInputStreamToFile(inputStream)
@@ -279,7 +279,7 @@ class TableObjectInstrumentedTest {
         val uuid = UUID.randomUUID()
 
         // Copy the file into the cache
-        val assetManager = InstrumentationRegistry.getContext().assets
+        val assetManager = InstrumentationRegistry.getInstrumentation().targetContext.assets
         val inputStream = assetManager.open("files/test/icon.ico")
         val file = File.createTempFile("icon", ".ico")
         file.copyInputStreamToFile(inputStream)
@@ -401,7 +401,7 @@ class TableObjectInstrumentedTest {
         val fileExt = ".ico"
 
         // Copy the file into the cache
-        val assetManager = InstrumentationRegistry.getContext().assets
+        val assetManager = InstrumentationRegistry.getInstrumentation().targetContext.assets
         val inputStream = assetManager.open("files/test/icon.ico")
         val file = File.createTempFile("icon", fileExt)
         file.copyInputStreamToFile(inputStream)
