@@ -1,9 +1,9 @@
 package app.dav.davandroidlibrary.data
 
-import android.arch.persistence.room.Database
-import android.arch.persistence.room.Room
-import android.arch.persistence.room.RoomDatabase
 import android.content.Context
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
 import app.dav.davandroidlibrary.Dav.databaseName
 import app.dav.davandroidlibrary.models.PropertyEntity
 import app.dav.davandroidlibrary.models.TableObjectEntity

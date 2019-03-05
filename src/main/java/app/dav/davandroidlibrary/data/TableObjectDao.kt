@@ -1,6 +1,6 @@
 package app.dav.davandroidlibrary.data
 
-import android.arch.persistence.room.*
+import androidx.room.*
 import app.dav.davandroidlibrary.models.TableObjectEntity
 
 @Dao

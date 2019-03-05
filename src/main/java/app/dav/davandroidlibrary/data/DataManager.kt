@@ -1,8 +1,8 @@
 package app.dav.davandroidlibrary.data
 
-import android.arch.lifecycle.MutableLiveData
 import android.os.Handler
 import android.os.Looper
+import androidx.lifecycle.MutableLiveData
 import app.dav.davandroidlibrary.Dav
 import app.dav.davandroidlibrary.HttpResultEntry
 import app.dav.davandroidlibrary.common.ProjectInterface
