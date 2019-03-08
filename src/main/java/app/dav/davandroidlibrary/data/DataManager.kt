@@ -7,6 +7,7 @@ import app.dav.davandroidlibrary.Dav
 import app.dav.davandroidlibrary.HttpResultEntry
 import app.dav.davandroidlibrary.common.ProjectInterface
 import app.dav.davandroidlibrary.models.*
+import app.dav.davandroidlibrary.workers.SyncWorker
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -17,6 +18,9 @@ import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
 
 internal const val extPropertyName = "ext"
+internal const val jwtKey = "jwt"
+internal const val tableIdsKey = "tableIds"
+internal const val parallelTableIdsKey = "parallelTableIds"
 private const val downloadFilesSimultaneously = 2
 
 private val syncJob = Job()
@@ -35,7 +39,7 @@ class DataManager{
 
         internal fun httpGet(jwt: String, url: String) : Deferred<HttpResultEntry>  = GlobalScope.async {
             val noInternetEntry = HttpResultEntry(false, "No internet connection")
-            val isNetworkAvailable = ProjectInterface.generalMethods?.isNetworkAvailable() ?: return@async noInternetEntry
+            val isNetworkAvailable = ProjectInterface.generalMethods?.isNetworkAvailable() ?: SyncWorker.isSyncing
             if(!isNetworkAvailable) return@async noInternetEntry
 
             val client = OkHttpClient()
@@ -73,9 +77,9 @@ class DataManager{
             fileDownloadProgress.clear()
 
             // Holds the table ids, e.g. 1, 2, 3, 4
-            val tableIds = ProjectInterface.retrieveConstants?.getTableIds() ?: return@async
+            val tableIds = ProjectInterface.retrieveConstants?.getTableIds() ?: SyncWorker.tableIds ?: return@async
             // Holds the parallel table ids, e.g. 2, 3
-            val parallelTableIds = ProjectInterface.retrieveConstants?.getParallelTableIds() ?: return@async
+            val parallelTableIds = ProjectInterface.retrieveConstants?.getParallelTableIds() ?: SyncWorker.parallelTableIds ?: return@async
             // Holds the order of the table ids, sorted by the pages and the parallel pages, e.g. 1, 2, 3, 2, 3, 4
             var sortedTableIds = arrayListOf<Int>()
             // Holds the pages of the table; in the format <tableId, pages>

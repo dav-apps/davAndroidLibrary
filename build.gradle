@@ -26,7 +26,7 @@ android {
 dependencies {
     def roomVersion = "2.1.0-alpha04"
     def lifecycleVersion = "2.0.0"
-    def workVersion = "1.0.0-rc02"
+    def workVersion = "1.0.0"
 
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 

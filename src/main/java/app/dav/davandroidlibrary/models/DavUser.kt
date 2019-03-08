@@ -5,6 +5,9 @@ import androidx.work.*
 import app.dav.davandroidlibrary.Dav
 import app.dav.davandroidlibrary.common.ProjectInterface
 import app.dav.davandroidlibrary.data.DataManager
+import app.dav.davandroidlibrary.data.jwtKey
+import app.dav.davandroidlibrary.data.parallelTableIdsKey
+import app.dav.davandroidlibrary.data.tableIdsKey
 import app.dav.davandroidlibrary.workers.SyncWorker
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
@@ -18,7 +21,7 @@ private const val avatarFileName = "avatar.png"
 private val avatarFilePath = Dav.dataPath + avatarFileName
 private const val syncWorkTag = "syncWork"
 
-class DavUser() {
+class DavUser {
     var email: String
         get() = getEmailFromSettings()
         set(value) = setEmailInSettings(value)
@@ -53,16 +56,22 @@ class DavUser() {
                 DataManager.sync().await()
             }
 
-            // Start the sync worker
-            val constraints = Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
-                    .setRequiresBatteryNotLow(true)
-                    .build()
+            val tableIds = ProjectInterface.retrieveConstants?.getTableIds()
+            val parallelTableIds = ProjectInterface.retrieveConstants?.getParallelTableIds()
 
-            val request: PeriodicWorkRequest = PeriodicWorkRequestBuilder<SyncWorker>(1, TimeUnit.DAYS)
-                    .setConstraints(constraints)
-                    .build()
-            WorkManager.getInstance().enqueueUniquePeriodicWork(syncWorkTag, ExistingPeriodicWorkPolicy.KEEP, request)
+            if(tableIds != null && parallelTableIds != null){
+                // Start the sync worker
+                val constraints = Constraints.Builder()
+                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                        .setRequiresBatteryNotLow(true)
+                        .build()
+
+                val request: PeriodicWorkRequest = PeriodicWorkRequestBuilder<SyncWorker>(1, TimeUnit.DAYS)
+                        .setConstraints(constraints)
+                        .setInputData(workDataOf(jwtKey to jwt, tableIdsKey to tableIds.toTypedArray(), parallelTableIdsKey to parallelTableIds.toTypedArray()))
+                        .build()
+                WorkManager.getInstance().enqueueUniquePeriodicWork(syncWorkTag, ExistingPeriodicWorkPolicy.KEEP, request)
+            }
         }else{
             isLoggedIn = false
         }
@@ -197,7 +206,7 @@ class DavUser() {
         }
 
         internal fun getJwtFromSettings() : String{
-            val localDataSettings = ProjectInterface.localDataSettings ?: return ""
+            val localDataSettings = ProjectInterface.localDataSettings ?: return SyncWorker.jwt
             return localDataSettings.getStringValue(Dav.jwtKey, "")
         }
 
